@@ -10,19 +10,22 @@ import admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 
-// Import the Firebase configuration to get the correct database ID
+dotenv.config();
+
+// Load Firebase config
 const configPath = path.join(process.cwd(), "firebase-applet-config.json");
 let firebaseConfig: any = {};
 try {
   firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-  console.log("Firebase config loaded:", JSON.stringify({ ...firebaseConfig, apiKey: "REDACTED" }));
+  console.log(
+    "Firebase config loaded:",
+    JSON.stringify({ ...firebaseConfig, apiKey: "REDACTED" })
+  );
 } catch (e: any) {
   console.error("Error loading firebase-applet-config.json:", e.message);
 }
 
-dotenv.config();
-
-// Force the project ID from config into environment variables
+// Force project ID
 if (firebaseConfig.projectId) {
   process.env.GOOGLE_CLOUD_PROJECT = firebaseConfig.projectId;
   process.env.GCLOUD_PROJECT = firebaseConfig.projectId;
@@ -39,7 +42,7 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir);
 }
 
-// Configure Multer
+// Multer config
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, "uploads/");
@@ -49,31 +52,103 @@ const storage = multer.diskStorage({
     cb(null, file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname));
   },
 });
-
 const upload = multer({ storage });
 
-let lastDbError: any = null;
-
-// Initialize Firebase Admin
+// Firebase globals
 let db: any = null;
 let auth: any = null;
 let firebaseApp: admin.app.App | null = null;
+let lastDbError: any = null;
+
+// Read service account JSON from Render env
+const getServiceAccountFromEnv = () => {
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw);
+
+    if (parsed.private_key) {
+      parsed.private_key = parsed.private_key.replace(/\\n/g, "\n");
+    }
+
+    return parsed;
+  } catch (error: any) {
+    console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT:", error.message);
+    return null;
+  }
+};
+
+// Initialize Firebase app
+const getFirebaseApp = async () => {
+  if (firebaseApp) return firebaseApp;
+
+  try {
+    if (admin.apps.length > 0) {
+      console.log(`Clearing ${admin.apps.length} existing Firebase apps...`);
+      await Promise.all(admin.apps.map((a) => a?.delete()));
+    }
+
+    const serviceAccountFromEnv = getServiceAccountFromEnv();
+
+    if (serviceAccountFromEnv) {
+      console.log("Initializing Firebase Admin using FIREBASE_SERVICE_ACCOUNT env var...");
+      firebaseApp = admin.initializeApp({
+        credential: admin.credential.cert(serviceAccountFromEnv as admin.ServiceAccount),
+        projectId: firebaseConfig.projectId || serviceAccountFromEnv.project_id,
+      });
+    } else if (
+      process.env.GOOGLE_APPLICATION_CREDENTIALS &&
+      fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)
+    ) {
+      console.log("Initializing Firebase Admin using local serviceAccountKey.json file...");
+      const serviceAccount = JSON.parse(
+        fs.readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, "utf-8")
+      );
+
+      firebaseApp = admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
+        projectId: firebaseConfig.projectId || serviceAccount.project_id,
+      });
+    } else {
+      console.log("Initializing Firebase Admin with projectId only...");
+      firebaseApp = admin.initializeApp({
+        projectId: firebaseConfig.projectId,
+      });
+    }
+
+    console.log(`Firebase Admin initialized with project: ${firebaseApp.options.projectId}`);
+    console.log(
+      "App Options:",
+      JSON.stringify({ ...firebaseApp.options, credential: "REDACTED" })
+    );
+
+    return firebaseApp;
+  } catch (e: any) {
+    console.error("Firebase Admin initialization failed:", e.message);
+    lastDbError = `Init failed: ${e.message}`;
+    return null;
+  }
+};
 
 const testDb = async (dbInstance: any, label: string) => {
   try {
-    // Try a simple read to verify connection with a timeout
-    const timeoutPromise = new Promise((_, reject) => 
+    const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error("Timeout connecting to Firestore")), 5000)
     );
-    
+
     const fetchPromise = dbInstance.collection("courses").limit(1).get();
-    const snap = await Promise.race([fetchPromise, timeoutPromise]) as any;
-    
-    console.log(`Firestore connection (${label}) verified. Project: ${dbInstance.projectId}, Database: ${dbInstance.databaseId}. Found ${snap.size} docs.`);
+    const snap = (await Promise.race([fetchPromise, timeoutPromise])) as any;
+
+    console.log(
+      `Firestore connection (${label}) verified. Project: ${dbInstance.projectId}, Database: ${dbInstance.databaseId}. Found ${snap.size} docs.`
+    );
     return true;
   } catch (error: any) {
-    console.error(`Firestore connection (${label}) failed (Project: ${dbInstance?.projectId}, Database: ${dbInstance?.databaseId}): ${error.message}`);
+    const errorMsg = `Firestore connection (${label}) failed (Project: ${dbInstance?.projectId}, Database: ${dbInstance?.databaseId}): ${error.message}`;
+    console.error(errorMsg);
     if (error.code) console.error(`Error code: ${error.code}`);
+    lastDbError = errorMsg;
     return false;
   }
 };
@@ -81,41 +156,22 @@ const testDb = async (dbInstance: any, label: string) => {
 const initializeDb = async () => {
   const dbId = firebaseConfig.firestoreDatabaseId;
   const projectId = firebaseConfig.projectId;
-  
+
   if (!projectId) {
     console.error("No project ID found in firebase-applet-config.json");
     return null;
   }
 
   console.log(`Initializing Firestore. Target Project: ${projectId}, Target Database: ${dbId}`);
-  
+
+  firebaseApp = await getFirebaseApp();
   if (!firebaseApp) {
-    try {
-      // Clear any existing apps to ensure we use the correct project ID for the default app
-      if (admin.apps.length > 0) {
-        console.log(`Clearing ${admin.apps.length} existing Firebase apps...`);
-        await Promise.all(admin.apps.map(a => a?.delete()));
-      }
-      
-      // Initialize with explicit project ID
-      firebaseApp = admin.initializeApp({ projectId });
-      console.log(`Firebase Admin initialized with project: ${projectId}`);
-      
-      if (firebaseApp) {
-        console.log("App Options:", JSON.stringify({ ...firebaseApp.options, credential: "REDACTED" }));
-      }
-    } catch (e: any) {
-      console.error("Firebase Admin initialization failed:", e.message);
-      lastDbError = `Init failed: ${e.message}`;
-      return null;
-    }
+    lastDbError = "getFirebaseApp() returned null. Check service account credentials and project ID.";
+    return null;
   }
 
-  if (!firebaseApp) return null;
-
   auth = getAuth(firebaseApp);
-  
-  // 1. Try named database if provided
+
   if (dbId && dbId !== "(default)") {
     try {
       console.log(`Attempting named database: ${dbId}`);
@@ -128,7 +184,6 @@ const initializeDb = async () => {
     }
   }
 
-  // 2. Try default database
   try {
     console.log("Attempting default database");
     const defaultDb = getFirestore(firebaseApp);
@@ -139,19 +194,17 @@ const initializeDb = async () => {
     console.error("Error initializing default database:", e.message);
   }
 
-  lastDbError = "All Firestore initialization attempts failed. Check project permissions and database existence.";
+  lastDbError = `All Firestore initialization attempts failed. Last error: ${lastDbError || 'Unknown'}`;
   console.warn(lastDbError);
-  return null; 
+  return null;
 };
-
-// Initial initialization removed to avoid double init and potential hangs
-// (async () => { ... })();
 
 async function seedAdmin() {
   if (!db || !auth) {
     console.error("Cannot seed admin: db or auth is null");
     return;
   }
+
   const adminEmail = "saikrishnagummadidala34@gmail.com";
   const adminPassword = "password123";
 
@@ -173,7 +226,6 @@ async function seedAdmin() {
       }
     }
 
-    // Ensure admin profile in Firestore
     const userDoc = await db.collection("users").doc(userRecord.uid).get();
     if (!userDoc.exists) {
       await db.collection("users").doc(userRecord.uid).set({
@@ -201,7 +253,8 @@ async function seedCourses() {
   const defaultCourses = [
     {
       title: "Java Script",
-      description: "Master the fundamentals of JavaScript, the language of the web. From basics to advanced asynchronous patterns.",
+      description:
+        "Master the fundamentals of JavaScript, the language of the web. From basics to advanced asynchronous patterns.",
       instructor: "Krishna",
       duration: "12h 30m",
       level: "Intermediate",
@@ -211,11 +264,12 @@ async function seedCourses() {
       thumbnailUrl: "https://picsum.photos/seed/js-nexus/800/500",
       published: true,
       createdAt: new Date().toISOString(),
-      enrollmentCount: 0
+      enrollmentCount: 0,
     },
     {
       title: "Python for Data Science",
-      description: "Learn Python from scratch and apply it to real-world data science problems. Includes NumPy, Pandas, and Scikit-Learn.",
+      description:
+        "Learn Python from scratch and apply it to real-world data science problems. Includes NumPy, Pandas, and Scikit-Learn.",
       instructor: "sai",
       duration: "15h 45m",
       level: "Intermediate",
@@ -225,11 +279,12 @@ async function seedCourses() {
       thumbnailUrl: "https://picsum.photos/seed/python-nexus/800/500",
       published: true,
       createdAt: new Date().toISOString(),
-      enrollmentCount: 0
+      enrollmentCount: 0,
     },
     {
       title: "Full-Stack Web Development",
-      description: "A comprehensive guide to building modern web applications from front-end to back-end.",
+      description:
+        "A comprehensive guide to building modern web applications from front-end to back-end.",
       instructor: "Prof. James Wilson",
       duration: "24h 45m",
       level: "Intermediate",
@@ -239,11 +294,12 @@ async function seedCourses() {
       thumbnailUrl: "https://picsum.photos/seed/fullstack-nexus/800/500",
       published: true,
       createdAt: new Date().toISOString(),
-      enrollmentCount: 850
+      enrollmentCount: 850,
     },
     {
       title: "Java Programming",
-      description: "Deep dive into Java programming, from object-oriented principles to advanced concurrency.",
+      description:
+        "Deep dive into Java programming, from object-oriented principles to advanced concurrency.",
       instructor: "Dr. Marcus Thorne",
       duration: "20h 15m",
       level: "Beginner",
@@ -253,8 +309,8 @@ async function seedCourses() {
       thumbnailUrl: "https://picsum.photos/seed/java-nexus/800/500",
       published: true,
       createdAt: new Date().toISOString(),
-      enrollmentCount: 120
-    }
+      enrollmentCount: 120,
+    },
   ];
 
   try {
@@ -268,10 +324,9 @@ async function seedCourses() {
       } else {
         console.log(`Course already exists: ${course.title}, updating all fields...`);
         const docId = q.docs[0].id;
-        // Update all fields from the defaultCourses definition
         await db.collection("courses").doc(docId).update({
           ...course,
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
         });
       }
     }
@@ -283,21 +338,21 @@ async function seedCourses() {
 
 async function startServer() {
   console.log("Starting NexusLearn server...");
-  
+
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json());
   app.use(cookieParser());
   app.use("/uploads", express.static("uploads"));
 
-  // Initialize Firebase
   db = await initializeDb();
   if (!db) {
-    console.error("CRITICAL: Failed to initialize Firebase on startup. Check firebase-applet-config.json and project settings.");
+    console.error(
+      "CRITICAL: Failed to initialize Firebase on startup. Check firebase-applet-config.json and project settings."
+    );
   }
 
-  // Run seeding in background to not block server startup
   (async () => {
     try {
       if (db) {
@@ -314,19 +369,17 @@ async function startServer() {
     }
   })();
 
-  // Health check at the top
   app.get("/api/health", (req, res) => {
-    res.json({ 
-      status: "ok", 
+    res.json({
+      status: "ok",
       message: "NexusLearn API is running",
       firebase: db ? "initialized" : "not initialized",
       projectId: firebaseConfig.projectId,
       databaseId: db ? db.databaseId : firebaseConfig.firestoreDatabaseId,
-      lastError: lastDbError
+      lastError: lastDbError,
     });
   });
 
-  // Helper to get Firestore instance with fallback
   const getDbInstance = async () => {
     if (!db) {
       console.log("Global db variable is null. Attempting re-initialization...");
@@ -338,15 +391,14 @@ async function startServer() {
         return null;
       }
     }
-    
+
     if (!db) {
       lastDbError = "Database initialization returned null. Check server logs.";
       return null;
     }
 
     try {
-      // Test if the current db instance is working using 'courses' collection with a timeout
-      const timeoutPromise = new Promise((_, reject) => 
+      const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("Timeout connecting to Firestore")), 5000)
       );
       const fetchPromise = db.collection("courses").limit(1).get();
@@ -356,10 +408,8 @@ async function startServer() {
       const errorMsg = `Firestore connection error (Project: ${db.projectId}, Database: ${db.databaseId}): ${error.message}`;
       console.error(errorMsg);
       lastDbError = { message: errorMsg, code: error.code };
-      
-      // If NOT_FOUND (code 5), it means the database instance doesn't exist.
+
       if (error.code === 5) {
-        // If we were using a named database, try the default one
         if (db.databaseId !== "(default)") {
           console.warn("Attempting fallback to default database...");
           try {
@@ -379,64 +429,91 @@ async function startServer() {
     }
   };
 
-  // Course Management API
-  app.post("/api/courses", upload.fields([
-    { name: "pdf", maxCount: 1 },
-    { name: "thumbnail", maxCount: 1 }
-  ]), async (req, res) => {
+  app.get("/api/hello", (req, res) => {
+    res.json({ message: "Hello from server" });
+  });
+
+  app.get("/api/courses", async (req, res) => {
     const currentDb = await getDbInstance();
-    if (!currentDb) return res.status(500).json({ error: "Firebase not initialized" });
-    
+    if (!currentDb) return res.status(500).json({ error: "DB not ready" });
+
     try {
-      const { title, description, content, instructor, level, instructorId } = req.body;
-      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
-      
-      const pdfFile = files["pdf"]?.[0];
-      const thumbnailFile = files["thumbnail"]?.[0];
-
-      const courseData = {
-        title,
-        description,
-        instructor: instructor || "System",
-        instructorId: instructorId || null,
-        level: level || "Beginner",
-        content: content || "",
-        pdfUrl: pdfFile ? `/uploads/${pdfFile.filename}` : "",
-        thumbnailUrl: thumbnailFile ? `/uploads/${thumbnailFile.filename}` : `https://picsum.photos/seed/${title.replace(/\s+/g, "").toLowerCase()}/800/600`,
-        published: false,
-        createdAt: new Date().toISOString(),
-        enrollmentCount: 0
-      };
-
-      const docRef = await currentDb.collection("courses").add(courseData);
-      res.json({ courseId: docRef.id, ...courseData });
+      const snap = await currentDb.collection("courses").get();
+      const courses = snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+      res.json(courses);
     } catch (error: any) {
-      console.error("Error creating course:", error);
-      res.status(500).json({ error: "Internal server error", details: error.message });
+      res.status(500).json({ error: error.message, lastError: lastDbError });
     }
   });
+
+  app.post(
+    "/api/courses",
+    upload.fields([
+      { name: "pdf", maxCount: 1 },
+      { name: "thumbnail", maxCount: 1 },
+    ]),
+    async (req, res) => {
+      const currentDb = await getDbInstance();
+      if (!currentDb) return res.status(500).json({ error: "Firebase not initialized" });
+
+      try {
+        const { title, description, content, instructor, level, instructorId } = req.body;
+        const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+
+        const pdfFile = files["pdf"]?.[0];
+        const thumbnailFile = files["thumbnail"]?.[0];
+
+        const courseData = {
+          title,
+          description,
+          instructor: instructor || "System",
+          instructorId: instructorId || null,
+          level: level || "Beginner",
+          content: content || "",
+          pdfUrl: pdfFile ? `/uploads/${pdfFile.filename}` : "",
+          thumbnailUrl: thumbnailFile
+            ? `/uploads/${thumbnailFile.filename}`
+            : `https://picsum.photos/seed/${title.replace(/\s+/g, "").toLowerCase()}/800/600`,
+          published: false,
+          createdAt: new Date().toISOString(),
+          enrollmentCount: 0,
+        };
+
+        const docRef = await currentDb.collection("courses").add(courseData);
+        res.json({ courseId: docRef.id, ...courseData });
+      } catch (error: any) {
+        console.error("Error creating course:", error);
+        res.status(500).json({ error: "Internal server error", details: error.message });
+      }
+    }
+  );
 
   app.delete("/api/courses/:id", async (req, res) => {
     const currentDb = await getDbInstance();
     if (!currentDb) return res.status(500).json({ error: "Firebase not initialized" });
-    
+
     try {
       const { id } = req.params;
       const doc = await currentDb.collection("courses").doc(id).get();
-      
+
       if (!doc.exists) {
         return res.status(404).json({ error: "Course not found" });
       }
 
       const data = doc.data();
-      
-      // Delete files from disk
+
       if (data?.pdfUrl) {
-        const pdfPath = path.join(process.cwd(), data.pdfUrl.startsWith('/') ? data.pdfUrl.slice(1) : data.pdfUrl);
+        const pdfPath = path.join(
+          process.cwd(),
+          data.pdfUrl.startsWith("/") ? data.pdfUrl.slice(1) : data.pdfUrl
+        );
         if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath);
       }
       if (data?.thumbnailUrl) {
-        const thumbPath = path.join(process.cwd(), data.thumbnailUrl.startsWith('/') ? data.thumbnailUrl.slice(1) : data.thumbnailUrl);
+        const thumbPath = path.join(
+          process.cwd(),
+          data.thumbnailUrl.startsWith("/") ? data.thumbnailUrl.slice(1) : data.thumbnailUrl
+        );
         if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
       }
 
@@ -451,7 +528,7 @@ async function startServer() {
   app.patch("/api/courses/:id", async (req, res) => {
     const currentDb = await getDbInstance();
     if (!currentDb) return res.status(500).json({ error: "Firebase not initialized" });
-    
+
     try {
       const { id } = req.params;
       const { published } = req.body;
@@ -463,67 +540,78 @@ async function startServer() {
     }
   });
 
-  app.put("/api/courses/:id", upload.fields([
-    { name: "pdf", maxCount: 1 },
-    { name: "thumbnail", maxCount: 1 }
-  ]), async (req, res) => {
-    const currentDb = await getDbInstance();
-    if (!currentDb) return res.status(500).json({ error: "Firebase not initialized" });
-    
-    try {
-      const { id } = req.params;
-      const { title, description, content, instructor, level } = req.body;
-      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
-      
-      const pdfFile = files["pdf"]?.[0];
-      const thumbnailFile = files["thumbnail"]?.[0];
+  app.put(
+    "/api/courses/:id",
+    upload.fields([
+      { name: "pdf", maxCount: 1 },
+      { name: "thumbnail", maxCount: 1 },
+    ]),
+    async (req, res) => {
+      const currentDb = await getDbInstance();
+      if (!currentDb) return res.status(500).json({ error: "Firebase not initialized" });
 
-      // Get existing course data to delete old files if needed
-      const courseDoc = await currentDb.collection("courses").doc(id).get();
-      if (!courseDoc.exists) {
-        return res.status(404).json({ error: "Course not found" });
-      }
-      const existingData = courseDoc.data();
+      try {
+        const { id } = req.params;
+        const { title, description, content, instructor, level } = req.body;
+        const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
-      const updateData: any = {
-        title,
-        description,
-        instructor: instructor || "System",
-        level: level || "Beginner",
-        content: content || "",
-        updatedAt: new Date().toISOString()
-      };
+        const pdfFile = files["pdf"]?.[0];
+        const thumbnailFile = files["thumbnail"]?.[0];
 
-      if (pdfFile) {
-        // Delete old PDF if it exists
-        if (existingData?.pdfUrl) {
-          const oldPdfPath = path.join(process.cwd(), existingData.pdfUrl.startsWith('/') ? existingData.pdfUrl.slice(1) : existingData.pdfUrl);
-          if (fs.existsSync(oldPdfPath)) fs.unlinkSync(oldPdfPath);
+        const courseDoc = await currentDb.collection("courses").doc(id).get();
+        if (!courseDoc.exists) {
+          return res.status(404).json({ error: "Course not found" });
         }
-        updateData.pdfUrl = `/uploads/${pdfFile.filename}`;
-      }
-      if (thumbnailFile) {
-        // Delete old thumbnail if it exists
-        if (existingData?.thumbnailUrl && !existingData.thumbnailUrl.startsWith('http')) {
-          const oldThumbPath = path.join(process.cwd(), existingData.thumbnailUrl.startsWith('/') ? existingData.thumbnailUrl.slice(1) : existingData.thumbnailUrl);
-          if (fs.existsSync(oldThumbPath)) fs.unlinkSync(oldThumbPath);
-        }
-        updateData.thumbnailUrl = `/uploads/${thumbnailFile.filename}`;
-      }
+        const existingData = courseDoc.data();
 
-      await currentDb.collection("courses").doc(id).update(updateData);
-      res.json({ success: true, id, ...updateData });
-    } catch (error: any) {
-      console.error("Error updating course:", error);
-      res.status(500).json({ error: "Internal server error", details: error.message });
+        const updateData: any = {
+          title,
+          description,
+          instructor: instructor || "System",
+          level: level || "Beginner",
+          content: content || "",
+          updatedAt: new Date().toISOString(),
+        };
+
+        if (pdfFile) {
+          if (existingData?.pdfUrl) {
+            const oldPdfPath = path.join(
+              process.cwd(),
+              existingData.pdfUrl.startsWith("/") ? existingData.pdfUrl.slice(1) : existingData.pdfUrl
+            );
+            if (fs.existsSync(oldPdfPath)) fs.unlinkSync(oldPdfPath);
+          }
+          updateData.pdfUrl = `/uploads/${pdfFile.filename}`;
+        }
+
+        if (thumbnailFile) {
+          if (existingData?.thumbnailUrl && !existingData.thumbnailUrl.startsWith("http")) {
+            const oldThumbPath = path.join(
+              process.cwd(),
+              existingData.thumbnailUrl.startsWith("/")
+                ? existingData.thumbnailUrl.slice(1)
+                : existingData.thumbnailUrl
+            );
+            if (fs.existsSync(oldThumbPath)) fs.unlinkSync(oldThumbPath);
+          }
+          updateData.thumbnailUrl = `/uploads/${thumbnailFile.filename}`;
+        }
+
+        await currentDb.collection("courses").doc(id).update(updateData);
+        res.json({ success: true, id, ...updateData });
+      } catch (error: any) {
+        console.error("Error updating course:", error);
+        res.status(500).json({ error: "Internal server error", details: error.message });
+      }
     }
-  });
+  );
 
-  // Debug API to see all courses
   app.get("/api/debug/courses", async (req, res) => {
     const currentDb = await getDbInstance();
-    if (!currentDb) return res.status(500).json({ error: "Firebase not initialized", lastError: lastDbError });
-    
+    if (!currentDb) {
+      return res.status(500).json({ error: "Firebase not initialized", lastError: lastDbError });
+    }
+
     try {
       const snap = await currentDb.collection("courses").get();
       const courses = snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
@@ -533,38 +621,34 @@ async function startServer() {
     }
   });
 
-  app.get("/api/hello", (req, res) => {
-    res.json({ message: "Hello from server" });
-  });
-
-  // Debug API to check Firebase status
   app.get("/api/debug/firebase", async (req, res) => {
-    const apps = admin.apps.map(a => ({
+    const apps = admin.apps.map((a) => ({
       name: a?.name,
       projectId: a?.options.projectId,
     }));
-    
+
     res.json({
       env: {
         GOOGLE_CLOUD_PROJECT: process.env.GOOGLE_CLOUD_PROJECT,
         GCLOUD_PROJECT: process.env.GCLOUD_PROJECT,
+        hasFirebaseServiceAccount: !!process.env.FIREBASE_SERVICE_ACCOUNT,
+        hasLocalCredentialsPath: !!process.env.GOOGLE_APPLICATION_CREDENTIALS,
       },
       apps,
       configProjectId: firebaseConfig.projectId,
-      lastError: lastDbError
+      lastError: lastDbError,
     });
   });
 
-  // Stats API with resilience
   app.get("/api/stats", async (req, res) => {
     console.log("Stats API called");
-    const currentDb = await getDbInstance();
-    if (!currentDb) {
-      console.error("Stats API: Firebase not initialized");
-      return res.status(500).json({ error: "Firebase not initialized" });
-    }
-    
     try {
+      const currentDb = await getDbInstance();
+      if (!currentDb) {
+        console.error("Stats API: Firebase not initialized");
+        return res.status(500).json({ error: "Firebase not initialized", lastError: lastDbError });
+      }
+
       const studentsSnap = await currentDb.collection("users").where("role", "==", "student").get();
       const coursesSnap = await currentDb.collection("courses").get();
       const enrollmentsSnap = await currentDb.collection("enrollments").get();
@@ -572,10 +656,12 @@ async function startServer() {
       const stats = {
         totalStudents: studentsSnap?.size || 0,
         totalCourses: coursesSnap?.size || 0,
-        totalEnrollments: enrollmentsSnap?.size || 0
+        totalEnrollments: enrollmentsSnap?.size || 0,
       };
 
-      console.log(`Stats API: Found ${stats.totalStudents} students, ${stats.totalCourses} courses, ${stats.totalEnrollments} enrollments`);
+      console.log(
+        `Stats API: Found ${stats.totalStudents} students, ${stats.totalCourses} courses, ${stats.totalEnrollments} enrollments`
+      );
 
       res.json(stats);
     } catch (error: any) {
@@ -584,7 +670,11 @@ async function startServer() {
     }
   });
 
-  // Vite middleware for development
+  // 404 handler for API routes
+  app.use("/api/*", (req, res) => {
+    res.status(404).json({ error: `API route not found: ${req.originalUrl}` });
+  });
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -601,6 +691,16 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
+  });
+
+  // Global error handler
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error("Global Error Handler:", err);
+    res.status(500).json({
+      error: "Unhandled server error",
+      message: err.message,
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+    });
   });
 }
 
