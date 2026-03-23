@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { BookOpen, Play, ArrowRight, GraduationCap, Search, ArrowLeft } from 'lucide-react';
+import { BookOpen, Play, ArrowRight, GraduationCap, Search, ArrowLeft, Terminal } from 'lucide-react';
 import { collection, onSnapshot, query, where, getDocs, doc, getDoc, addDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../context/AuthContext';
@@ -124,6 +124,19 @@ export const StudentDashboard = () => {
         >
           <Search className="w-6 h-6" />
           Browse All Courses
+        </Link>
+        <Link
+          to="/student/playground"
+          className="p-8 rounded-[2.5rem] bg-indigo-600/10 border border-indigo-600/20 group hover:bg-indigo-600/20 transition-all"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-indigo-600/20 rounded-2xl">
+              <Terminal className="w-6 h-6 text-indigo-400" />
+            </div>
+            <ArrowRight className="w-5 h-5 text-indigo-400 group-hover:translate-x-1 transition-transform" />
+          </div>
+          <h3 className="text-xl font-bold mb-2">Code Playground</h3>
+          <p className="text-sm text-gray-400">Practice your coding skills with our real-time JavaScript compiler.</p>
         </Link>
       </div>
 

@@ -14,7 +14,8 @@ import {
   ChevronRight,
   ArrowLeft,
   GraduationCap,
-  Globe
+  Globe,
+  Terminal
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { logout } from '../../firebase';
@@ -53,6 +54,7 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
       { icon: LayoutDashboard, label: 'Dashboard', path: '/student/dashboard' },
       { icon: BookOpen, label: 'Browse Courses', path: '/student/courses' },
       { icon: GraduationCap, label: 'My Learning', path: '/student/dashboard#my-learning' },
+      { icon: Terminal, label: 'Code Playground', path: '/student/playground' },
       { icon: Settings, label: 'Settings', path: '/settings' },
     ];
 

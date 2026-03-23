@@ -5,11 +5,10 @@ import { LandingPage } from './pages/LandingPage';
 import { AuthPage } from './pages/AuthPage';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { StudentDashboard } from './pages/dashboards/StudentDashboard';
-import { InstructorDashboard } from './pages/dashboards/InstructorDashboard';
 import { AdminDashboard } from './pages/dashboards/AdminDashboard';
-import { InstructorCourseManagement } from './components/instructor/InstructorCourseManagement';
 import { CourseCatalog } from './pages/CourseCatalog';
 import { CourseDetail } from './pages/CourseDetail';
+import { CodePlayground } from './pages/CodePlayground';
 
 const ProtectedRoute = ({ children, requiredRole }: { children: React.ReactNode, requiredRole?: string }) => {
   const { user, profile, loading } = useAuth();
@@ -28,7 +27,7 @@ const ProtectedRoute = ({ children, requiredRole }: { children: React.ReactNode,
       <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-white p-8 text-center">
         <h2 className="text-2xl font-bold mb-4">Profile Not Found</h2>
         <p className="text-gray-400 mb-8">We couldn't load your user profile. Please try refreshing or contact support.</p>
-        <button 
+        <button
           onClick={() => window.location.reload()}
           className="bg-indigo-600 px-6 py-2 rounded-xl font-bold"
         >
@@ -61,12 +60,11 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
 
 const DashboardRedirect = () => {
   const { profile, loading } = useAuth();
-  
+
   if (loading) return null;
   if (!profile) return <Navigate to="/login" />;
 
   if (profile.role === 'admin') return <Navigate to="/admin/dashboard" />;
-  if (profile.role === 'instructor') return <Navigate to="/instructor/dashboard" />;
   return <Navigate to="/student/dashboard" />;
 };
 
@@ -86,7 +84,7 @@ export default function App() {
               <AuthPage mode="signup" />
             </PublicRoute>
           } />
-          
+
           <Route path="/dashboard" element={
             <ProtectedRoute>
               <DashboardRedirect />
@@ -97,22 +95,6 @@ export default function App() {
             <ProtectedRoute requiredRole="admin">
               <DashboardLayout>
                 <AdminDashboard />
-              </DashboardLayout>
-            </ProtectedRoute>
-          } />
-
-          <Route path="/instructor/dashboard" element={
-            <ProtectedRoute requiredRole="instructor">
-              <DashboardLayout>
-                <InstructorDashboard />
-              </DashboardLayout>
-            </ProtectedRoute>
-          } />
-
-          <Route path="/instructor/courses" element={
-            <ProtectedRoute requiredRole="instructor">
-              <DashboardLayout>
-                <InstructorCourseManagement />
               </DashboardLayout>
             </ProtectedRoute>
           } />
@@ -133,6 +115,14 @@ export default function App() {
             </ProtectedRoute>
           } />
 
+          <Route path="/student/playground" element={
+            <ProtectedRoute requiredRole="student">
+              <DashboardLayout>
+                <CodePlayground />
+              </DashboardLayout>
+            </ProtectedRoute>
+          } />
+
           <Route path="/courses/:id" element={
             <ProtectedRoute requiredRole="student">
               <DashboardLayout>
@@ -142,7 +132,7 @@ export default function App() {
           } />
 
           {/* Add more routes for courses, lessons, etc. */}
-          
+
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>
