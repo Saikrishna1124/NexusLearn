@@ -23,19 +23,34 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Starfield } from '../3d/Starfield';
 import { AITutorWidget } from '../AITutorWidget';
 
-const SidebarItem = ({ icon: Icon, label, active, onClick }: { icon: any, label: string, active?: boolean, onClick?: () => void }) => (
-  <button
-    onClick={onClick}
-    className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${active
-        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
-        : 'text-gray-400 hover:bg-white/5 hover:text-white'
-      }`}
-  >
-    <Icon className="w-5 h-5" />
-    <span className="font-medium">{label}</span>
-    {active && <ChevronRight className="ml-auto w-4 h-4" />}
-  </button>
-);
+const SidebarItem = ({ icon: Icon, label, active, to, onClick }: { icon: any, label: string, active?: boolean, to?: string, onClick?: () => void }) => {
+  const content = (
+    <>
+      <Icon className="w-5 h-5" />
+      <span className="font-medium">{label}</span>
+      {active && <ChevronRight className="ml-auto w-4 h-4" />}
+    </>
+  );
+
+  const className = `w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${active
+      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+      : 'text-gray-400 hover:bg-white/5 hover:text-white'
+    }`;
+
+  if (to) {
+    return (
+      <Link to={to} onClick={onClick} className={className}>
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <button onClick={onClick} className={className}>
+      {content}
+    </button>
+  );
+};
 
 export const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -55,7 +70,6 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
       { icon: BookOpen, label: 'Browse Courses', path: '/student/courses' },
       { icon: GraduationCap, label: 'My Learning', path: '/student/dashboard#my-learning' },
       { icon: Terminal, label: 'Code Playground', path: '/student/playground' },
-      { icon: Settings, label: 'Settings', path: '/settings' },
     ];
 
   return (
@@ -80,18 +94,18 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
                 key={item.label}
                 icon={item.icon}
                 label={item.label}
-                active={location.pathname + location.hash === item.path}
+                to={item.path}
+                active={location.pathname === item.path.split('#')[0] && (item.path.includes('#') ? location.hash === '#' + item.path.split('#')[1] : location.hash === '')}
                 onClick={() => {
                   if (item.path.includes('#')) {
-                    const [path, hash] = item.path.split('#');
-                    if (location.pathname === path) {
-                      const element = document.getElementById(hash);
-                      if (element) {
+                    const hash = item.path.split('#')[1];
+                    const element = document.getElementById(hash);
+                    if (element) {
+                      setTimeout(() => {
                         element.scrollIntoView({ behavior: 'smooth' });
-                      }
+                      }, 100);
                     }
                   }
-                  navigate(item.path);
                 }}
               />
             ))}

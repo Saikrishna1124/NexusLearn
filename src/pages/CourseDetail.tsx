@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { BookOpen, Sparkles, FileText, ArrowLeft, Loader2, MessageSquare, Book, Lock } from 'lucide-react';
-import { doc, getDoc, query, collection, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, query, collection, where, getDocs, updateDoc, setDoc, serverTimestamp, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getAITutorResponse } from '../services/aiService';
 import { QuizSection } from '../components/QuizSection';
@@ -18,6 +18,103 @@ export const CourseDetail = () => {
   const [isApproved, setIsApproved] = useState(false);
   const [summary, setSummary] = useState('');
   const [generatingSummary, setGeneratingSummary] = useState(false);
+  const [startTime] = useState(Date.now());
+
+  useEffect(() => {
+    const trackTime = async () => {
+      if (!id || !user || isAdmin) return;
+
+      return async () => {
+        const endTime = Date.now();
+        const durationSeconds = Math.floor((endTime - startTime) / 1000);
+
+        if (durationSeconds < 5) return; // Don't track very short visits
+
+        try {
+          // Log session
+          await addDoc(collection(db, 'sessions'), {
+            userId: user.uid,
+            courseId: id,
+            courseTitle: course?.title || 'Course',
+            startTime: new Date(startTime).toISOString(),
+            endTime: new Date(endTime).toISOString(),
+            durationSeconds
+          });
+
+          const q = query(
+            collection(db, 'enrollments'),
+            where('userId', '==', user.uid),
+            where('courseId', '==', id)
+          );
+          const snap = await getDocs(q);
+
+          if (!snap.empty) {
+            const enrollmentDoc = snap.docs[0];
+            const currentData = enrollmentDoc.data();
+
+            // Parse current timeSpent (e.g., "1h 20m 30s" or "45s")
+            const parseTimeSpent = (timeStr: string) => {
+              if (!timeStr || typeof timeStr !== 'string') return 0;
+              let totalSeconds = 0;
+              const h = timeStr.match(/(\d+)h/);
+              const m = timeStr.match(/(\d+)m/);
+              const s = timeStr.match(/(\d+)s/);
+              if (h) totalSeconds += parseInt(h[1]) * 3600;
+              if (m) totalSeconds += parseInt(m[1]) * 60;
+              if (s) totalSeconds += parseInt(s[1]);
+              return totalSeconds;
+            };
+
+            const formatTimeSpent = (totalSeconds: number) => {
+              const h = Math.floor(totalSeconds / 3600);
+              const m = Math.floor((totalSeconds % 3600) / 60);
+              const s = totalSeconds % 60;
+              let result = '';
+              if (h > 0) result += `${h}h `;
+              if (m > 0) result += `${m}m `;
+              if (s > 0 || result === '') result += `${s}s`;
+              return result.trim();
+            };
+
+            const totalSeconds = parseTimeSpent(currentData.timeSpent) + durationSeconds;
+            await updateDoc(enrollmentDoc.ref, {
+              timeSpent: formatTimeSpent(totalSeconds),
+              lastAccessed: serverTimestamp()
+            });
+          } else {
+            // Create enrollment if it doesn't exist (though it should via request approval)
+            const formatTimeSpent = (totalSeconds: number) => {
+              const h = Math.floor(totalSeconds / 3600);
+              const m = Math.floor((totalSeconds % 3600) / 60);
+              const s = totalSeconds % 60;
+              let result = '';
+              if (h > 0) result += `${h}h `;
+              if (m > 0) result += `${m}m `;
+              if (s > 0 || result === '') result += `${s}s`;
+              return result.trim();
+            };
+
+            await addDoc(collection(db, 'enrollments'), {
+              userId: user.uid,
+              courseId: id,
+              progress: 0,
+              grade: 0,
+              timeSpent: formatTimeSpent(durationSeconds),
+              lastAccessed: serverTimestamp(),
+              enrolledAt: serverTimestamp()
+            });
+          }
+        } catch (error) {
+          console.error('Error tracking time:', error);
+        }
+      };
+    };
+
+    const cleanupPromise = trackTime();
+    return () => {
+      cleanupPromise.then(cleanup => cleanup && cleanup());
+    };
+  }, [id, user, isAdmin, startTime]);
 
   useEffect(() => {
     const fetchCourseAndCheckAccess = async () => {
