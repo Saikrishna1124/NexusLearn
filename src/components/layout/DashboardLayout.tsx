@@ -51,20 +51,12 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
       { icon: Users, label: 'Students', path: '/admin/users' },
       { icon: Settings, label: 'Settings', path: '/settings' },
     ]
-    : profile?.role === 'instructor'
-      ? [
-        { icon: LayoutDashboard, label: 'Dashboard', path: '/instructor/dashboard' },
-        { icon: BookOpen, label: 'My Courses', path: '/instructor/courses' },
-        { icon: Globe, label: 'Browse Courses', path: '/student/courses' },
-        { icon: Users, label: 'My Students', path: '/instructor/dashboard' },
-        { icon: Settings, label: 'Settings', path: '/settings' },
-      ]
-      : [
-        { icon: LayoutDashboard, label: 'Dashboard', path: '/student/dashboard' },
-        { icon: BookOpen, label: 'Browse Courses', path: '/student/courses' },
-        { icon: GraduationCap, label: 'My Learning', path: '/student/dashboard' },
-        { icon: Settings, label: 'Settings', path: '/settings' },
-      ];
+    : [
+      { icon: LayoutDashboard, label: 'Dashboard', path: '/student/dashboard' },
+      { icon: BookOpen, label: 'Browse Courses', path: '/student/courses' },
+      { icon: GraduationCap, label: 'My Learning', path: '/student/dashboard' },
+      { icon: Settings, label: 'Settings', path: '/settings' },
+    ];
 
   return (
     <div className="min-h-screen bg-[#050505] text-white flex">
@@ -115,7 +107,15 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
               <Menu className="w-6 h-6 text-gray-400" />
             </button>
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => {
+                if (location.pathname.startsWith('/courses/')) {
+                  navigate('/student/courses');
+                } else if (location.pathname === '/student/courses') {
+                  navigate('/student/dashboard');
+                } else {
+                  navigate(-1);
+                }
+              }}
               className="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 rounded-lg transition-colors text-gray-400 text-sm font-medium"
             >
               <ArrowLeft className="w-4 h-4" />

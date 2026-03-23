@@ -63,11 +63,11 @@ export const CourseDetail = () => {
     <div className="max-w-7xl mx-auto space-y-8">
       <div className="flex items-center justify-between">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigate('/student/courses')}
           className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
-          Back to Courses
+          Back to Catalog
         </button>
         <div className="flex items-center gap-4">
           <span className="px-3 py-1 rounded-full bg-indigo-600/20 text-indigo-400 text-xs font-bold uppercase tracking-wider">
@@ -99,10 +99,10 @@ export const CourseDetail = () => {
             </div>
           )}
 
-          <QuizSection 
-            courseId={course.id} 
-            courseTitle={course.title} 
-            courseContent={course.content || course.description || ''} 
+          <QuizSection
+            courseId={course.id}
+            courseTitle={course.title}
+            courseContent={course.content || course.description || ''}
           />
         </div>
 
@@ -111,7 +111,7 @@ export const CourseDetail = () => {
           <div className="p-8 rounded-[2rem] bg-white/5 border border-white/10 backdrop-blur-sm">
             <h1 className="text-3xl font-bold mb-4">{course.title}</h1>
             <p className="text-gray-400 leading-relaxed mb-8">{course.description}</p>
-            
+
             <div className="space-y-4">
               <div className="flex items-center gap-3 text-sm text-gray-300">
                 <FileText className="w-5 h-5 text-indigo-400" />
@@ -131,7 +131,7 @@ export const CourseDetail = () => {
             <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
               AI Course Summary
             </h3>
-            
+
             <AnimatePresence mode="wait">
               {!summary ? (
                 <motion.div

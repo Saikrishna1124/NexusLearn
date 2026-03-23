@@ -84,7 +84,7 @@ export const CourseCatalog = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => navigate('/student/dashboard')}
               className="p-3 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors"
             >
               <ChevronLeft className="w-5 h-5" />
@@ -101,15 +101,6 @@ export const CourseCatalog = () => {
                 >
                   <ChevronLeft className="w-4 h-4" />
                   Back to Admin Dashboard
-                </button>
-              )}
-              {profile?.role === 'instructor' && (
-                <button
-                  onClick={() => navigate('/instructor/dashboard')}
-                  className="mt-2 flex items-center gap-2 text-neonBlue hover:text-white transition-colors text-sm font-bold"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  Back to Instructor Dashboard
                 </button>
               )}
             </div>
