@@ -7,6 +7,7 @@ import AddCourseModal from '../modals/AddCourseModal';
 
 export const CourseManagement = () => {
   const [courses, setCourses] = useState<any[]>([]);
+  const [enrollmentCounts, setEnrollmentCounts] = useState<Record<string, number>>({});
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingCourse, setEditingCourse] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +21,23 @@ export const CourseManagement = () => {
     }, (error) => {
       console.error('Firestore onSnapshot error in CourseManagement:', error);
       setError(`Database error: ${error.message}. Please check your connection.`);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const q = query(collection(db, 'enrollments'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const counts: Record<string, number> = {};
+      snapshot.docs.forEach(doc => {
+        const data = doc.data();
+        if (data.courseId) {
+          counts[data.courseId] = (counts[data.courseId] || 0) + 1;
+        }
+      });
+      setEnrollmentCounts(counts);
+    }, (error) => {
+      console.error('Firestore onSnapshot error for enrollments in CourseManagement:', error);
     });
     return () => unsubscribe();
   }, []);
@@ -56,7 +74,7 @@ export const CourseManagement = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" id="manage-courses">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-2xl font-bold">Manage Courses</h3>
@@ -112,7 +130,7 @@ export const CourseManagement = () => {
                     </div>
                   </td>
                   <td className="p-6">
-                    <div className="text-white font-bold">{course.enrollmentCount || 0}</div>
+                    <div className="text-white font-bold">{enrollmentCounts[course.id] || 0}</div>
                   </td>
                   <td className="p-6">
                     {course.published ? (
@@ -161,7 +179,7 @@ export const CourseManagement = () => {
 
       <AnimatePresence>
         {showAddModal && (
-          <AddCourseModal 
+          <AddCourseModal
             onClose={handleCloseModal}
             editingCourse={editingCourse}
             onAdd={(newCourse) => {

@@ -1,39 +1,74 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
+import { useLocation } from 'react-router-dom';
 import { Shield, Users, BookOpen, Activity, Globe } from 'lucide-react';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { db } from '../../firebase';
 import { CourseManagement } from '../../components/admin/CourseManagement';
 import { CourseRequestManagement } from '../../components/admin/CourseRequestManagement';
 
 export const AdminDashboard = () => {
+  const location = useLocation();
   const [stats, setStats] = useState({
     totalStudents: 0,
     totalCourses: 0,
     totalEnrollments: 0
   });
+  const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log('AdminDashboard mounted, fetching stats...');
-    setLoading(true);
-    fetch('/api/stats')
-      .then(async res => {
-        if (!res.ok) {
-          const errorData = await res.json().catch(() => ({}));
-          throw new Error(errorData.error || errorData.details || 'Failed to fetch stats');
-        }
-        return res.json();
-      })
-      .then(data => {
-        setStats(data);
-        setError(null);
-      })
-      .catch(err => {
-        console.error('Failed to fetch stats:', err);
-        setError(`Could not load dashboard statistics: ${err.message}`);
-      })
-      .finally(() => setLoading(false));
+    console.log('AdminDashboard mounted, initializing listeners...');
+
+    // Total Students listener
+    const qStudents = query(collection(db, 'users'), where('role', '==', 'student'));
+    const unsubscribeStudents = onSnapshot(qStudents, (snapshot) => {
+      setStats(prev => ({ ...prev, totalStudents: snapshot.size }));
+
+      const studentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const sortedStudents = studentsData.sort((a: any, b: any) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      });
+      setStudents(sortedStudents);
+      setLoading(false);
+    }, (err) => {
+      console.error('Failed to fetch students:', err);
+      setError(`Could not load students: ${err.message}`);
+    });
+
+    // Total Courses listener
+    const qCourses = query(collection(db, 'courses'));
+    const unsubscribeCourses = onSnapshot(qCourses, (snapshot) => {
+      setStats(prev => ({ ...prev, totalCourses: snapshot.size }));
+    });
+
+    // Total Enrollments listener
+    const qEnrollments = query(collection(db, 'enrollments'));
+    const unsubscribeEnrollments = onSnapshot(qEnrollments, (snapshot) => {
+      setStats(prev => ({ ...prev, totalEnrollments: snapshot.size }));
+    });
+
+    return () => {
+      unsubscribeStudents();
+      unsubscribeCourses();
+      unsubscribeEnrollments();
+    };
   }, []);
+
+  useEffect(() => {
+    if (!loading && location.hash) {
+      const hash = location.hash.replace('#', '');
+      const element = document.getElementById(hash);
+      if (element) {
+        setTimeout(() => {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      }
+    }
+  }, [loading, location.hash]);
 
   if (loading) {
     return (
@@ -88,34 +123,44 @@ export const AdminDashboard = () => {
 
       <div className="grid lg:grid-cols-2 gap-8">
         {/* AI Usage Analytics - keeping as visual representation */}
-        <div className="p-8 rounded-3xl bg-white/5 border border-white/10">
-          <h3 className="text-xl font-bold mb-6">Recent User Registrations</h3>
+        <div className="p-8 rounded-3xl bg-white/5 border border-white/10" id="registered-students">
+          <h3 className="text-xl font-bold mb-6">Registered Students</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
                 <tr className="text-gray-500 text-sm border-b border-white/10">
-                  <th className="pb-4 font-medium">User</th>
-                  <th className="pb-4 font-medium">Role</th>
-                  <th className="pb-4 font-medium">Status</th>
+                  <th className="pb-4 font-medium">Student</th>
+                  <th className="pb-4 font-medium">Email</th>
                   <th className="pb-4 font-medium">Joined</th>
                 </tr>
               </thead>
               <tbody className="text-sm">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <tr key={i} className="border-b border-white/5 last:border-0">
-                    <td className="py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-indigo-600/20" />
-                        <span className="font-medium">User {i}</span>
-                      </div>
+                {students.length > 0 ? (
+                  students.map((student) => (
+                    <tr key={student.id} className="border-b border-white/5 last:border-0">
+                      <td className="py-4">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={student.photoURL || `https://ui-avatars.com/api/?name=${student.displayName || 'User'}&background=4f46e5&color=fff`}
+                            className="w-8 h-8 rounded-full border border-white/10"
+                            alt={student.displayName}
+                          />
+                          <span className="font-medium">{student.displayName || 'Anonymous'}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 text-gray-400">{student.email}</td>
+                      <td className="py-4 text-gray-400">
+                        {student.createdAt ? new Date(student.createdAt).toLocaleDateString() : 'N/A'}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={3} className="py-8 text-center text-gray-500">
+                      No students registered yet.
                     </td>
-                    <td className="py-4 capitalize text-gray-400">Student</td>
-                    <td className="py-4">
-                      <span className="px-2 py-1 rounded-full bg-green-500/10 text-green-400 text-xs">Active</span>
-                    </td>
-                    <td className="py-4 text-gray-400">2h ago</td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>

@@ -45,16 +45,14 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
   const menuItems = profile?.role === 'admin'
     ? [
       { icon: LayoutDashboard, label: 'Dashboard', path: '/admin/dashboard' },
-      { icon: BookOpen, label: 'Manage Courses', path: '/admin/dashboard' },
-      { icon: Globe, label: 'Browse Courses', path: '/student/courses' },
-      { icon: GraduationCap, label: 'Student View', path: '/student/dashboard' },
-      { icon: Users, label: 'Students', path: '/admin/users' },
-      { icon: Settings, label: 'Settings', path: '/settings' },
+      { icon: BookOpen, label: 'Manage Courses', path: '/admin/dashboard#manage-courses' },
+      { icon: Bell, label: 'Course Requests', path: '/admin/dashboard#course-requests' },
+      { icon: GraduationCap, label: 'Student View', path: '/admin/dashboard#registered-students' },
     ]
     : [
       { icon: LayoutDashboard, label: 'Dashboard', path: '/student/dashboard' },
       { icon: BookOpen, label: 'Browse Courses', path: '/student/courses' },
-      { icon: GraduationCap, label: 'My Learning', path: '/student/dashboard' },
+      { icon: GraduationCap, label: 'My Learning', path: '/student/dashboard#my-learning' },
       { icon: Settings, label: 'Settings', path: '/settings' },
     ];
 
@@ -80,8 +78,19 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
                 key={item.label}
                 icon={item.icon}
                 label={item.label}
-                active={location.pathname === item.path}
-                onClick={() => navigate(item.path)}
+                active={location.pathname + location.hash === item.path}
+                onClick={() => {
+                  if (item.path.includes('#')) {
+                    const [path, hash] = item.path.split('#');
+                    if (location.pathname === path) {
+                      const element = document.getElementById(hash);
+                      if (element) {
+                        element.scrollIntoView({ behavior: 'smooth' });
+                      }
+                    }
+                  }
+                  navigate(item.path);
+                }}
               />
             ))}
           </div>

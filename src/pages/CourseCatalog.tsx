@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 export const CourseCatalog = () => {
   const [courses, setCourses] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
+  const [enrollmentCounts, setEnrollmentCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const { user, profile, isAdmin } = useAuth();
@@ -36,9 +37,22 @@ export const CourseCatalog = () => {
       });
     }
 
+    const qEnroll = query(collection(db, 'enrollments'));
+    const unsubscribeEnrollments = onSnapshot(qEnroll, (snapshot) => {
+      const counts: Record<string, number> = {};
+      snapshot.docs.forEach(doc => {
+        const data = doc.data();
+        if (data.courseId) {
+          counts[data.courseId] = (counts[data.courseId] || 0) + 1;
+        }
+      });
+      setEnrollmentCounts(counts);
+    });
+
     return () => {
       unsubscribeCourses();
       unsubscribeRequests();
+      unsubscribeEnrollments();
     };
   }, [isAdmin, user]);
 
@@ -199,7 +213,7 @@ export const CourseCatalog = () => {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Users className="w-3.5 h-3.5" />
-                    <span>{course.enrollmentCount || 0} students</span>
+                    <span>{enrollmentCounts[course.id] || 0} students</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5" />

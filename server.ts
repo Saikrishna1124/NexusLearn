@@ -294,7 +294,7 @@ async function seedCourses() {
       thumbnailUrl: "https://picsum.photos/seed/fullstack-nexus/800/500",
       published: true,
       createdAt: new Date().toISOString(),
-      enrollmentCount: 850,
+      enrollmentCount: 0,
     },
     {
       title: "Java Programming",
@@ -309,7 +309,7 @@ async function seedCourses() {
       thumbnailUrl: "https://picsum.photos/seed/java-nexus/800/500",
       published: true,
       createdAt: new Date().toISOString(),
-      enrollmentCount: 120,
+      enrollmentCount: 0,
     },
   ];
 
@@ -621,6 +621,19 @@ async function startServer() {
     }
   });
 
+  app.get("/api/debug/users", async (req, res) => {
+    try {
+      const currentDb = await getDbInstance();
+      if (!currentDb) return res.status(500).json({ error: "DB not ready" });
+
+      const snap = await currentDb.collection("users").get();
+      const users = snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+      res.json({ count: snap.size, users });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/debug/firebase", async (req, res) => {
     const apps = admin.apps.map((a) => ({
       name: a?.name,
@@ -670,6 +683,29 @@ async function startServer() {
     }
   });
 
+  app.get("/api/admin/students", async (req, res) => {
+    try {
+      const currentDb = await getDbInstance();
+      if (!currentDb) return res.status(500).json({ error: "DB not ready" });
+
+      const studentsSnap = await currentDb.collection("users")
+        .where("role", "==", "student")
+        .get();
+
+      console.log(`Students API: Found ${studentsSnap.size} students`);
+
+      const students = studentsSnap.docs.map((doc: any) => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      res.json(students);
+    } catch (error: any) {
+      console.error("Error fetching students:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // 404 handler for API routes
   app.use("/api/*", (req, res) => {
     res.status(404).json({ error: `API route not found: ${req.originalUrl}` });
@@ -690,7 +726,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on port ${PORT}`);
   });
 
   // Global error handler

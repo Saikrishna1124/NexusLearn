@@ -78,7 +78,7 @@ export const CourseRequestManagement = () => {
     }
 
     return (
-        <div className="bg-white/5 border border-white/10 rounded-[2.5rem] overflow-hidden">
+        <div className="bg-white/5 border border-white/10 rounded-[2.5rem] overflow-hidden" id="course-requests">
             <div className="p-8 border-b border-white/10 flex items-center justify-between">
                 <div>
                     <h2 className="text-2xl font-bold">Course Access Requests</h2>

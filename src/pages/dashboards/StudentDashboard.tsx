@@ -4,7 +4,7 @@ import { BookOpen, Play, ArrowRight, GraduationCap, Search, ArrowLeft } from 'lu
 import { collection, onSnapshot, query, where, getDocs, doc, getDoc, addDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../../context/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 
 export const StudentDashboard = () => {
   const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
@@ -13,6 +13,19 @@ export const StudentDashboard = () => {
   const navigate = useNavigate();
 
   const [recommendedCourses, setRecommendedCourses] = useState<any[]>([]);
+  const location = useLocation();
+
+  useEffect(() => {
+    if (!loading && location.hash) {
+      const hash = location.hash.replace('#', '');
+      const element = document.getElementById(hash);
+      if (element) {
+        setTimeout(() => {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      }
+    }
+  }, [loading, location.hash]);
 
   useEffect(() => {
     if (!user) return;
@@ -114,7 +127,7 @@ export const StudentDashboard = () => {
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8" id="my-learning">
         {enrolledCourses.length > 0 ? (
           enrolledCourses.map((course) => (
             <motion.div
