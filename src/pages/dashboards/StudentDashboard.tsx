@@ -17,49 +17,75 @@ export const StudentDashboard = () => {
   useEffect(() => {
     if (!user) return;
 
-    // Fetch enrolled courses
-    const qEnroll = query(collection(db, 'enrollments'), where('userId', '==', user.uid));
-    const unsubscribeEnroll = onSnapshot(qEnroll, async (snapshot) => {
-      const enrolledIds = snapshot.docs.map(d => d.data().courseId);
+    // Fetch approved course requests
+    const qReq = query(
+      collection(db, 'course_requests'),
+      where('userId', '==', user.uid),
+      where('status', '==', 'approved')
+    );
+
+    const unsubscribeReq = onSnapshot(qReq, async (snapshot) => {
+      const approvedIds = snapshot.docs.map(d => d.data().courseId);
 
       const coursesData = await Promise.all(
-        snapshot.docs.map(async (enrollmentDoc) => {
-          const enrollment = enrollmentDoc.data();
-          const courseDoc = await getDoc(doc(db, 'courses', enrollment.courseId));
+        snapshot.docs.map(async (requestDoc) => {
+          const request = requestDoc.data();
+          const courseDoc = await getDoc(doc(db, 'courses', request.courseId));
           if (!courseDoc.exists()) return null;
+
+          // Try to find enrollment for progress
+          const qEnroll = query(
+            collection(db, 'enrollments'),
+            where('userId', '==', user.uid),
+            where('courseId', '==', request.courseId)
+          );
+          const enrollSnap = await getDocs(qEnroll);
+          const enrollment = !enrollSnap.empty ? enrollSnap.docs[0].data() : { progress: 0 };
+
           return {
             id: courseDoc.id,
             ...courseDoc.data(),
             progress: enrollment.progress,
-            enrolledAt: enrollment.enrolledAt
+            enrolledAt: request.requestedAt
           };
         })
       );
       setEnrolledCourses(coursesData.filter(Boolean));
       setLoading(false);
 
-      // Fetch recommended (not enrolled) courses
+      // Fetch recommended (not requested/approved) courses
       const qCourses = query(collection(db, 'courses'), where('published', '==', true));
       const coursesSnap = await getDocs(qCourses);
       const allCourses = coursesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setRecommendedCourses(allCourses.filter(c => !enrolledIds.includes(c.id)).slice(0, 3));
+
+      // Fetch all user requests to filter out
+      const qAllReq = query(collection(db, 'course_requests'), where('userId', '==', user.uid));
+      const allReqSnap = await getDocs(qAllReq);
+      const requestedIds = allReqSnap.docs.map(d => d.data().courseId);
+
+      setRecommendedCourses(allCourses.filter(c => !requestedIds.includes(c.id)).slice(0, 3));
     });
 
-    return () => unsubscribeEnroll();
+    return () => unsubscribeReq();
   }, [user]);
 
-  const enroll = async (courseId: string) => {
+  const requestAccess = async (course: any) => {
     if (!user) return;
     try {
-      await addDoc(collection(db, 'enrollments'), {
+      await addDoc(collection(db, 'course_requests'), {
         userId: user.uid,
-        courseId,
-        enrolledAt: new Date().toISOString(),
-        progress: 0
+        userEmail: user.email,
+        userName: profile?.displayName || 'Student',
+        courseId: course.id,
+        courseTitle: course.title,
+        status: 'pending',
+        requestedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       });
-      navigate(`/courses/${courseId}`);
+      // Redirect to catalog to see pending status
+      navigate('/student/courses');
     } catch (error) {
-      console.error('Enrollment failed:', error);
+      console.error('Request failed:', error);
     }
   };
 
@@ -76,15 +102,6 @@ export const StudentDashboard = () => {
             >
               <ArrowLeft className="w-4 h-4" />
               Back to Admin Dashboard
-            </button>
-          )}
-          {profile?.role === 'instructor' && (
-            <button
-              onClick={() => navigate('/instructor/dashboard')}
-              className="mt-4 flex items-center gap-2 text-indigo-400 hover:text-indigo-300 font-bold transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Instructor Dashboard
             </button>
           )}
         </div>
@@ -173,10 +190,10 @@ export const StudentDashboard = () => {
                   <img src={course.thumbnailUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt="" />
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4">
                     <button
-                      onClick={() => enroll(course.id)}
+                      onClick={() => requestAccess(course)}
                       className="bg-white text-black px-6 py-2 rounded-xl font-bold text-sm flex items-center gap-2"
                     >
-                      Enroll <ArrowRight className="w-4 h-4" />
+                      Request Access <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>
                 </div>

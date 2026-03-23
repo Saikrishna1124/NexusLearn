@@ -9,7 +9,7 @@ service cloud.firestore {
     // Fields: uid, email, displayName, role, photoURL, createdAt, bio
     //
     // Collection: courses
-    // Fields: title, description, instructorId, category, price, thumbnail, status, createdAt
+    // Fields: title, description, category, price, thumbnail, status, createdAt
     //
     // Collection: courses/{courseId}/lessons
     // Fields: courseId, title, content, videoUrl, pdfUrl, order, summary
@@ -39,10 +39,6 @@ service cloud.firestore {
          (request.auth.token.email == "saikrishnagummadidala34@gmail.com" && request.auth.token.email_verified == true));
     }
 
-    function isInstructor() {
-      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'instructor';
-    }
-
     function isStudent() {
       return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student';
     }
@@ -61,11 +57,11 @@ service cloud.firestore {
     function isValidUser(data) {
       return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'role', 'photoURL', 'createdAt']) &&
              data.uid is string && data.email is string && isValidEmail(data.email) &&
-             data.role in ['student', 'instructor', 'admin'];
+             data.role in ['student', 'admin'];
     }
 
     function isValidCourse(data) {
-      return hasOnlyAllowedFields(['title', 'description', 'pdfUrl', 'thumbnailUrl', 'published', 'createdAt', 'enrollmentCount', 'instructor', 'instructorId', 'level', 'content']) &&
+      return hasOnlyAllowedFields(['title', 'description', 'pdfUrl', 'thumbnailUrl', 'published', 'createdAt', 'enrollmentCount', 'instructor', 'level', 'content']) &&
              data.title is string && data.published is bool;
     }
 
@@ -74,28 +70,39 @@ service cloud.firestore {
              data.userId is string && data.courseId is string;
     }
 
+    function isValidCourseRequest(data) {
+      return hasOnlyAllowedFields(['userId', 'userEmail', 'userName', 'courseId', 'courseTitle', 'status', 'requestedAt', 'updatedAt']) &&
+             data.userId is string && data.courseId is string &&
+             data.status in ['pending', 'approved', 'rejected'];
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
 
     match /users/{uid} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isOwner(uid) && isValidUser(request.resource.data) && (request.resource.data.role in ['student', 'instructor'] || isAdmin());
+      allow create: if isAuthenticated() && isOwner(uid) && isValidUser(request.resource.data) && (request.resource.data.role == 'student' || isAdmin());
       allow update: if isAuthenticated() && (isOwner(uid) || isAdmin()) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
       allow delete: if isAdmin();
     }
 
     match /courses/{courseId} {
       allow read: if true;
-      allow create: if isAdmin() || (isInstructor() && request.resource.data.instructorId == request.auth.uid && isValidCourse(request.resource.data));
-      allow update: if isAdmin() || (isInstructor() && resource.data.instructorId == request.auth.uid && isValidCourse(request.resource.data));
-      allow delete: if isAdmin() || (isInstructor() && resource.data.instructorId == request.auth.uid);
+      allow create, update, delete: if isAdmin();
     }
 
     match /enrollments/{enrollmentId} {
       allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId && isValidEnrollment(request.resource.data);
+      allow create: if isAuthenticated() && (request.auth.uid == request.resource.data.userId || isAdmin()) && isValidEnrollment(request.resource.data);
       allow update: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin()) && isValidEnrollment(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /course_requests/{requestId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId && isValidCourseRequest(request.resource.data) && request.resource.data.status == 'pending';
+      allow update: if isAdmin() && isValidCourseRequest(request.resource.data);
       allow delete: if isAdmin();
     }
 

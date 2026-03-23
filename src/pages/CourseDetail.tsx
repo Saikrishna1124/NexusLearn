@@ -1,39 +1,65 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { BookOpen, Sparkles, FileText, ArrowLeft, Loader2, MessageSquare, Book } from 'lucide-react';
-import { doc, getDoc } from 'firebase/firestore';
+import { BookOpen, Sparkles, FileText, ArrowLeft, Loader2, MessageSquare, Book, Lock } from 'lucide-react';
+import { doc, getDoc, query, collection, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getAITutorResponse } from '../services/aiService';
 import { QuizSection } from '../components/QuizSection';
+import { useAuth } from '../context/AuthContext';
 import ReactMarkdown from 'react-markdown';
 
 export const CourseDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user, isAdmin } = useAuth();
   const [course, setCourse] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isApproved, setIsApproved] = useState(false);
   const [summary, setSummary] = useState('');
   const [generatingSummary, setGeneratingSummary] = useState(false);
 
   useEffect(() => {
-    const fetchCourse = async () => {
-      if (!id) return;
+    const fetchCourseAndCheckAccess = async () => {
+      if (!id || !user) return;
+
       try {
+        // 1. Fetch Course
         const docSnap = await getDoc(doc(db, 'courses', id));
-        if (docSnap.exists()) {
-          setCourse({ id: docSnap.id, ...docSnap.data() });
-        } else {
+        if (!docSnap.exists()) {
           navigate('/student/dashboard');
+          return;
+        }
+        const courseData = { id: docSnap.id, ...docSnap.data() };
+        setCourse(courseData);
+
+        // 2. Check Access
+        if (isAdmin) {
+          setIsApproved(true);
+        } else {
+          const q = query(
+            collection(db, 'course_requests'),
+            where('userId', '==', user.uid),
+            where('courseId', '==', id),
+            where('status', '==', 'approved')
+          );
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            setIsApproved(true);
+          } else {
+            // Not approved, redirect back to catalog
+            navigate('/student/courses');
+          }
         }
       } catch (error) {
-        console.error('Error fetching course:', error);
+        console.error('Error fetching course or checking access:', error);
+        navigate('/student/courses');
       } finally {
         setLoading(false);
       }
     };
-    fetchCourse();
-  }, [id, navigate]);
+    fetchCourseAndCheckAccess();
+  }, [id, user, isAdmin, navigate]);
 
   const generateSummary = async () => {
     if (!course) return;

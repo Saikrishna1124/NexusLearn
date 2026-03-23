@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Shield, Users, BookOpen, Activity, Globe } from 'lucide-react';
 import { CourseManagement } from '../../components/admin/CourseManagement';
+import { CourseRequestManagement } from '../../components/admin/CourseRequestManagement';
 
 export const AdminDashboard = () => {
   const [stats, setStats] = useState({
@@ -82,6 +83,8 @@ export const AdminDashboard = () => {
       </div>
 
       <CourseManagement />
+
+      <CourseRequestManagement />
 
       <div className="grid lg:grid-cols-2 gap-8">
         {/* AI Usage Analytics - keeping as visual representation */}

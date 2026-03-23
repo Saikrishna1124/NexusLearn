@@ -5,92 +5,269 @@
       "description": "Represents a user of the platform (Student or Admin).",
       "type": "object",
       "properties": {
-        "uid": { "type": "string", "description": "Firebase Auth UID" },
-        "email": { "type": "string", "format": "email" },
-        "displayName": { "type": "string" },
-        "role": { "type": "string", "enum": ["student", "admin"] },
-        "photoURL": { "type": "string", "format": "uri" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "student",
+            "admin"
+          ]
+        },
+        "photoURL": {
+          "type": "string",
+          "format": "uri"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["uid", "email", "role"]
+      "required": [
+        "uid",
+        "email",
+        "role"
+      ]
     },
     "Course": {
       "title": "Course",
       "description": "An educational course created by an admin.",
       "type": "object",
       "properties": {
-        "title": { "type": "string" },
-        "description": { "type": "string" },
-        "instructor": { "type": "string" },
-        "duration": { "type": "string" },
-        "level": { "type": "string" },
-        "category": { "type": "string" },
-        "price": { "type": "number" },
-        "rating": { "type": "number" },
-        "content": { "type": "string", "description": "Full text content of the course for AI context" },
-        "pdfUrl": { "type": "string", "description": "Path to PDF on disk" },
-        "thumbnailUrl": { "type": "string", "description": "Path to thumbnail on disk" },
-        "published": { "type": "boolean" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "enrollmentCount": { "type": "number" }
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "instructor": {
+          "type": "string"
+        },
+        "duration": {
+          "type": "string"
+        },
+        "level": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        },
+        "price": {
+          "type": "number"
+        },
+        "rating": {
+          "type": "number"
+        },
+        "content": {
+          "type": "string",
+          "description": "Full text content of the course for AI context"
+        },
+        "pdfUrl": {
+          "type": "string",
+          "description": "Path to PDF on disk"
+        },
+        "thumbnailUrl": {
+          "type": "string",
+          "description": "Path to thumbnail on disk"
+        },
+        "published": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "enrollmentCount": {
+          "type": "number"
+        }
       },
-      "required": ["title", "published"]
+      "required": [
+        "title",
+        "published"
+      ]
     },
     "Enrollment": {
       "title": "Enrollment",
       "description": "Tracks a student's enrollment in a course.",
       "type": "object",
       "properties": {
-        "userId": { "type": "string" },
-        "courseId": { "type": "string" },
-        "progress": { "type": "number", "description": "Percentage completion" },
-        "enrolledAt": { "type": "string", "format": "date-time" }
+        "userId": {
+          "type": "string"
+        },
+        "courseId": {
+          "type": "string"
+        },
+        "progress": {
+          "type": "number",
+          "description": "Percentage completion"
+        },
+        "enrolledAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["userId", "courseId"]
+      "required": [
+        "userId",
+        "courseId"
+      ]
     },
     "Quiz": {
       "title": "Quiz",
       "description": "A quiz generated for a course.",
       "type": "object",
       "properties": {
-        "courseId": { "type": "string" },
+        "courseId": {
+          "type": "string"
+        },
         "questions": {
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
-              "question": { "type": "string" },
-              "options": { "type": "array", "items": { "type": "string" } },
-              "correctAnswerIndex": { "type": "number" },
-              "explanation": { "type": "string" }
+              "question": {
+                "type": "string"
+              },
+              "options": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "correctAnswerIndex": {
+                "type": "number"
+              },
+              "explanation": {
+                "type": "string"
+              }
             }
           }
         },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["courseId", "questions"]
+      "required": [
+        "courseId",
+        "questions"
+      ]
     },
     "QuizResult": {
       "title": "QuizResult",
       "description": "A student's result for a quiz.",
       "type": "object",
       "properties": {
-        "userId": { "type": "string" },
-        "courseId": { "type": "string" },
-        "quizId": { "type": "string" },
-        "score": { "type": "number" },
-        "totalQuestions": { "type": "number" },
-        "answers": { "type": "array", "items": { "type": "number" } },
-        "completedAt": { "type": "string", "format": "date-time" }
+        "userId": {
+          "type": "string"
+        },
+        "courseId": {
+          "type": "string"
+        },
+        "quizId": {
+          "type": "string"
+        },
+        "score": {
+          "type": "number"
+        },
+        "totalQuestions": {
+          "type": "number"
+        },
+        "answers": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "completedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["userId", "courseId", "quizId", "score"]
+      "required": [
+        "userId",
+        "courseId",
+        "quizId",
+        "score"
+      ]
+    },
+    "CourseRequest": {
+      "title": "CourseRequest",
+      "description": "A student's request to access a course.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "userEmail": {
+          "type": "string",
+          "format": "email"
+        },
+        "userName": {
+          "type": "string"
+        },
+        "courseId": {
+          "type": "string"
+        },
+        "courseTitle": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "approved",
+            "rejected"
+          ]
+        },
+        "requestedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "courseId",
+        "status"
+      ]
     }
   },
   "firestore": {
-    "/users/{uid}": { "schema": "User", "description": "User profiles" },
-    "/courses/{courseId}": { "schema": "Course", "description": "Course metadata" },
-    "/enrollments/{enrollmentId}": { "schema": "Enrollment", "description": "Student enrollments" },
-    "/quizzes/{quizId}": { "schema": "Quiz", "description": "Course quizzes" },
-    "/quiz_results/{resultId}": { "schema": "QuizResult", "description": "Student quiz results" }
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/courses/{courseId}": {
+      "schema": "Course",
+      "description": "Course metadata"
+    },
+    "/enrollments/{enrollmentId}": {
+      "schema": "Enrollment",
+      "description": "Student enrollments"
+    },
+    "/quizzes/{quizId}": {
+      "schema": "Quiz",
+      "description": "Course quizzes"
+    },
+    "/quiz_results/{resultId}": {
+      "schema": "QuizResult",
+      "description": "Student quiz results"
+    },
+    "/course_requests/{requestId}": {
+      "schema": "CourseRequest",
+      "description": "Student course access requests"
+    }
   }
 }
