@@ -88,6 +88,32 @@
         },
         "enrollmentCount": {
           "type": "number"
+        },
+        "topics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "videoUrl": {
+                "type": "string",
+                "format": "uri"
+              },
+              "quizId": {
+                "type": "string",
+                "description": "Reference to a Quiz document for this topic"
+              }
+            }
+          }
+        },
+        "overallQuizId": {
+          "type": "string",
+          "description": "Reference to the overall course Quiz"
         }
       },
       "required": [
@@ -110,7 +136,21 @@
           "type": "number",
           "description": "Percentage completion"
         },
+        "completedTopics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "IDs of completed topics"
+        },
         "enrolledAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "timeSpent": {
+          "type": "string"
+        },
+        "lastAccessed": {
           "type": "string",
           "format": "date-time"
         }

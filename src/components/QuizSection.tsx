@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Brain, 
-  CheckCircle2, 
-  XCircle, 
-  ArrowRight, 
-  Loader2, 
-  Trophy, 
+import {
+  Brain,
+  CheckCircle2,
+  XCircle,
+  ArrowRight,
+  Loader2,
+  Trophy,
   RefreshCw,
   AlertCircle
 } from 'lucide-react';
@@ -26,11 +26,13 @@ interface QuizSectionProps {
   courseId: string;
   courseTitle: string;
   courseContent: string;
+  questions?: Question[];
+  onComplete?: (score: number, total: number) => void;
 }
 
-export const QuizSection: React.FC<QuizSectionProps> = ({ courseId, courseTitle, courseContent }) => {
+export const QuizSection: React.FC<QuizSectionProps> = ({ courseId, courseTitle, courseContent, questions, onComplete }) => {
   const { user } = useAuth();
-  const [quiz, setQuiz] = useState<Question[] | null>(null);
+  const [quiz, setQuiz] = useState<Question[] | null>(questions || null);
   const [loading, setLoading] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
@@ -106,6 +108,9 @@ export const QuizSection: React.FC<QuizSectionProps> = ({ courseId, courseTitle,
 
   const finishQuiz = async () => {
     setShowResults(true);
+    if (onComplete) {
+      onComplete(score, quiz!.length);
+    }
     if (!user) return;
 
     try {
@@ -135,7 +140,7 @@ export const QuizSection: React.FC<QuizSectionProps> = ({ courseId, courseTitle,
   if (showResults) {
     const percentage = Math.round((score / quiz!.length) * 100);
     return (
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         className="p-8 rounded-[2rem] bg-white/5 border border-white/10 text-center space-y-6"
@@ -147,9 +152,9 @@ export const QuizSection: React.FC<QuizSectionProps> = ({ courseId, courseTitle,
           <h3 className="text-2xl font-bold mb-2">Quiz Completed!</h3>
           <p className="text-gray-400">You scored {score} out of {quiz!.length}</p>
         </div>
-        
+
         <div className="relative h-4 bg-white/5 rounded-full overflow-hidden max-w-md mx-auto">
-          <motion.div 
+          <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${percentage}%` }}
             className={`h-full ${percentage >= 70 ? 'bg-emerald-500' : percentage >= 40 ? 'bg-amber-500' : 'bg-rose-500'}`}
@@ -178,7 +183,7 @@ export const QuizSection: React.FC<QuizSectionProps> = ({ courseId, courseTitle,
   if (quiz) {
     const currentQuestion = quiz[currentQuestionIndex];
     return (
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="p-8 rounded-[2rem] bg-white/5 border border-white/10 space-y-8"
@@ -204,9 +209,8 @@ export const QuizSection: React.FC<QuizSectionProps> = ({ courseId, courseTitle,
                 key={idx}
                 onClick={() => handleOptionSelect(idx)}
                 disabled={isAnswered}
-                className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center justify-between ${
-                  selectedOption === idx 
-                    ? isAnswered 
+                className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center justify-between ${selectedOption === idx
+                    ? isAnswered
                       ? idx === currentQuestion.correctAnswerIndex
                         ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
                         : 'bg-rose-500/10 border-rose-500 text-rose-400'
@@ -214,7 +218,7 @@ export const QuizSection: React.FC<QuizSectionProps> = ({ courseId, courseTitle,
                     : isAnswered && idx === currentQuestion.correctAnswerIndex
                       ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
                       : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
-                }`}
+                  }`}
               >
                 <span>{option}</span>
                 {isAnswered && idx === currentQuestion.correctAnswerIndex && <CheckCircle2 className="w-5 h-5" />}
@@ -226,23 +230,20 @@ export const QuizSection: React.FC<QuizSectionProps> = ({ courseId, courseTitle,
 
         <AnimatePresence>
           {isAnswered && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
-              className={`p-6 rounded-2xl border ${
-                selectedOption === currentQuestion.correctAnswerIndex 
-                  ? 'bg-emerald-500/5 border-emerald-500/20' 
+              className={`p-6 rounded-2xl border ${selectedOption === currentQuestion.correctAnswerIndex
+                  ? 'bg-emerald-500/5 border-emerald-500/20'
                   : 'bg-rose-500/5 border-rose-500/20'
-              }`}
+                }`}
             >
               <div className="flex items-start gap-3">
-                <AlertCircle className={`w-5 h-5 mt-0.5 ${
-                  selectedOption === currentQuestion.correctAnswerIndex ? 'text-emerald-400' : 'text-rose-400'
-                }`} />
+                <AlertCircle className={`w-5 h-5 mt-0.5 ${selectedOption === currentQuestion.correctAnswerIndex ? 'text-emerald-400' : 'text-rose-400'
+                  }`} />
                 <div>
-                  <div className={`font-bold mb-1 ${
-                    selectedOption === currentQuestion.correctAnswerIndex ? 'text-emerald-400' : 'text-rose-400'
-                  }`}>
+                  <div className={`font-bold mb-1 ${selectedOption === currentQuestion.correctAnswerIndex ? 'text-emerald-400' : 'text-rose-400'
+                    }`}>
                     {selectedOption === currentQuestion.correctAnswerIndex ? 'Correct!' : 'Incorrect'}
                   </div>
                   <p className="text-sm text-gray-400 leading-relaxed">
@@ -288,7 +289,7 @@ export const QuizSection: React.FC<QuizSectionProps> = ({ courseId, courseTitle,
           <p className="text-gray-400 mb-6">
             Ready to test your understanding? Our AI will generate a unique quiz based on the course material.
           </p>
-          
+
           {previousResult && (
             <div className="mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
               <CheckCircle2 className="w-4 h-4" />
@@ -310,22 +311,22 @@ export const QuizSection: React.FC<QuizSectionProps> = ({ courseId, courseTitle,
 };
 
 const Sparkles = ({ className }: { className?: string }) => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    width="24" 
-    height="24" 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
     className={className}
   >
-    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
-    <path d="M5 3v4"/>
-    <path d="M19 17v4"/>
-    <path d="M3 5h4"/>
-    <path d="M17 19h4"/>
+    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
+    <path d="M5 3v4" />
+    <path d="M19 17v4" />
+    <path d="M3 5h4" />
+    <path d="M17 19h4" />
   </svg>
 );

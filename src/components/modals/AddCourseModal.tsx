@@ -1,17 +1,24 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { X, Upload, CheckCircle, AlertCircle } from 'lucide-react';
+import { X, Upload, CheckCircle, AlertCircle, Plus, Trash2, Sparkles, Loader2, Video } from 'lucide-react';
 import GlassPanel from '../ui/GlassPanel';
+import { generateTopicQuiz, generateOverallQuiz } from '../../services/aiService';
+
+interface Topic {
+  id: string;
+  title: string;
+  videoUrl: string;
+  quiz?: any[];
+}
 
 interface AddCourseModalProps {
   onClose: () => void;
   onAdd: (course: any) => void;
   initialInstructorName?: string;
-  instructorId?: string;
   editingCourse?: any;
 }
 
-export default function AddCourseModal({ onClose, onAdd, initialInstructorName, instructorId, editingCourse }: AddCourseModalProps) {
+export default function AddCourseModal({ onClose, onAdd, initialInstructorName, editingCourse }: AddCourseModalProps) {
   const [title, setTitle] = useState(editingCourse?.title || '');
   const [instructor, setInstructor] = useState(editingCourse?.instructor || initialInstructorName || '');
   const [difficulty, setDifficulty] = useState(editingCourse?.level || 'Beginner');
@@ -20,7 +27,56 @@ export default function AddCourseModal({ onClose, onAdd, initialInstructorName, 
   const [isUploading, setIsUploading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [thumbnail, setThumbnail] = useState<File | null>(null);
+  const [topics, setTopics] = useState<Topic[]>(editingCourse?.topics || []);
+  const [overallQuiz, setOverallQuiz] = useState<any[] | null>(editingCourse?.overallQuiz || null);
+  const [generatingQuiz, setGeneratingQuiz] = useState<string | null>(null); // topicId or 'overall'
   const [error, setError] = useState<string | null>(null);
+
+  const addTopic = () => {
+    setTopics([...topics, { id: Date.now().toString(), title: '', videoUrl: '' }]);
+  };
+
+  const removeTopic = (id: string) => {
+    setTopics(topics.filter(t => t.id !== id));
+  };
+
+  const updateTopic = (id: string, field: keyof Topic, value: string) => {
+    setTopics(topics.map(t => t.id === id ? { ...t, [field]: value } : t));
+  };
+
+  const handleGenerateTopicQuiz = async (topic: Topic) => {
+    if (!topic.title) {
+      setError('Please enter a topic title first.');
+      return;
+    }
+    setGeneratingQuiz(topic.id);
+    try {
+      const quiz = await generateTopicQuiz(topic.title, content || description);
+      setTopics(topics.map(t => t.id === topic.id ? { ...t, quiz } : t));
+    } catch (err) {
+      console.error('Failed to generate topic quiz:', err);
+      setError('Failed to generate quiz. Please try again.');
+    } finally {
+      setGeneratingQuiz(null);
+    }
+  };
+
+  const handleGenerateOverallQuiz = async () => {
+    if (!title) {
+      setError('Please enter a course title first.');
+      return;
+    }
+    setGeneratingQuiz('overall');
+    try {
+      const quiz = await generateOverallQuiz(title, content || description);
+      setOverallQuiz(quiz);
+    } catch (err) {
+      console.error('Failed to generate overall quiz:', err);
+      setError('Failed to generate overall quiz. Please try again.');
+    } finally {
+      setGeneratingQuiz(null);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -45,11 +101,10 @@ export default function AddCourseModal({ onClose, onAdd, initialInstructorName, 
     formData.append('title', title);
     formData.append('instructor', instructor);
     formData.append('content', content);
-    if (instructorId) {
-      formData.append('instructorId', instructorId);
-    }
     formData.append('level', difficulty);
     formData.append('description', description);
+    formData.append('topics', JSON.stringify(topics));
+    formData.append('overallQuiz', JSON.stringify(overallQuiz));
     if (file) {
       formData.append('pdf', file);
     }
@@ -60,7 +115,7 @@ export default function AddCourseModal({ onClose, onAdd, initialInstructorName, 
     try {
       const url = editingCourse ? `/api/courses/${editingCourse.id}` : '/api/courses';
       const method = editingCourse ? 'PUT' : 'POST';
-      
+
       const response = await fetch(url, {
         method,
         body: formData,
@@ -72,7 +127,7 @@ export default function AddCourseModal({ onClose, onAdd, initialInstructorName, 
       }
 
       const data = await response.json();
-      
+
       onAdd({
         id: editingCourse ? editingCourse.id : data.courseId,
         title,
@@ -170,14 +225,126 @@ export default function AddCourseModal({ onClose, onAdd, initialInstructorName, 
                     type="button"
                     onClick={() => setDifficulty(level)}
                     className={`flex-1 py-3 rounded-xl border transition-all font-bold text-sm ${difficulty === level
-                        ? 'bg-neonBlue/20 border-neonBlue text-neonBlue'
-                        : 'bg-white/5 border-white/10 text-gray-500 hover:border-white/30'
+                      ? 'bg-neonBlue/20 border-neonBlue text-neonBlue'
+                      : 'bg-white/5 border-white/10 text-gray-500 hover:border-white/30'
                       }`}
                   >
                     {level}
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-mono text-neonBlue uppercase tracking-widest">Course Topics & Videos</label>
+                <button
+                  type="button"
+                  onClick={addTopic}
+                  className="flex items-center gap-2 text-xs font-bold text-neonBlue hover:text-white transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Topic
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {topics.map((topic, index) => (
+                  <div key={topic.id} className="p-6 rounded-2xl bg-white/5 border border-white/10 space-y-4 relative group">
+                    <button
+                      type="button"
+                      onClick={() => removeTopic(topic.id)}
+                      className="absolute top-4 right-4 p-2 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">Topic {index + 1} Title</label>
+                        <input
+                          type="text"
+                          value={topic.title}
+                          onChange={(e) => updateTopic(topic.id, 'title', e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-neonBlue/50"
+                          placeholder="e.g. Introduction to Quantum"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">Video URL</label>
+                        <div className="relative">
+                          <Video className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                          <input
+                            type="text"
+                            value={topic.videoUrl}
+                            onChange={(e) => updateTopic(topic.id, 'videoUrl', e.target.value)}
+                            className="w-full bg-black/40 border border-white/10 rounded-xl py-2 pl-10 pr-3 text-sm text-white focus:outline-none focus:border-neonBlue/50"
+                            placeholder="https://youtube.com/..."
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {topic.quiz ? (
+                          <div className="flex items-center gap-1 text-neonGreen text-[10px] font-bold uppercase">
+                            <CheckCircle className="w-3 h-3" />
+                            Quiz Generated ({topic.quiz.length} questions)
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-gray-500 font-bold uppercase">No Quiz Generated</div>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleGenerateTopicQuiz(topic)}
+                        disabled={generatingQuiz === topic.id}
+                        className="flex items-center gap-2 text-[10px] font-bold text-indigo-400 hover:text-white transition-colors disabled:opacity-50"
+                      >
+                        {generatingQuiz === topic.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-3 h-3" />
+                        )}
+                        {topic.quiz ? 'Regenerate Quiz' : 'Generate AI Quiz'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {topics.length === 0 && (
+                  <div className="text-center py-8 border-2 border-dashed border-white/5 rounded-2xl text-gray-500 text-sm italic">
+                    No topics added yet. Add topics to include videos and quizzes.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-indigo-600/5 border border-indigo-600/20 flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-bold text-white mb-1">Overall Course Quiz</h4>
+                <p className="text-[10px] text-gray-500">Generate a comprehensive quiz (10-15 questions) for the entire course.</p>
+                {overallQuiz && (
+                  <div className="mt-2 flex items-center gap-1 text-neonGreen text-[10px] font-bold uppercase">
+                    <CheckCircle className="w-3 h-3" />
+                    Overall Quiz Ready ({overallQuiz.length} questions)
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={handleGenerateOverallQuiz}
+                disabled={generatingQuiz === 'overall'}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600/20 border border-indigo-600/30 text-indigo-400 text-xs font-bold hover:bg-indigo-600 hover:text-white transition-all disabled:opacity-50"
+              >
+                {generatingQuiz === 'overall' ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+                {overallQuiz ? 'Regenerate Overall Quiz' : 'Generate Overall Quiz'}
+              </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

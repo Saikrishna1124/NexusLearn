@@ -34,6 +34,48 @@ export const generateQuizQuestions = async (content: string) => {
   return JSON.parse(response.text);
 };
 
+export const generateTopicQuiz = async (topicName: string, courseContent: string) => {
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: `Generate 5 high-quality multiple choice questions specifically about the topic "${topicName}" within the context of this course. 
+    Return as a JSON array of objects with the following structure:
+    {
+      "question": "The question text",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctAnswerIndex": 0,
+      "explanation": "Brief explanation of why this is correct"
+    }
+    
+    COURSE CONTEXT:
+    ${courseContent}`,
+    config: {
+      responseMimeType: "application/json",
+    },
+  });
+  return JSON.parse(response.text);
+};
+
+export const generateOverallQuiz = async (courseTitle: string, courseContent: string) => {
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: `Generate 10 to 15 high-quality multiple choice questions covering the entire course "${courseTitle}". 
+    Return as a JSON array of objects with the following structure:
+    {
+      "question": "The question text",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctAnswerIndex": 0,
+      "explanation": "Brief explanation of why this is correct"
+    }
+    
+    COURSE CONTENT:
+    ${courseContent}`,
+    config: {
+      responseMimeType: "application/json",
+    },
+  });
+  return JSON.parse(response.text);
+};
+
 export const getAITutorResponse = async (history: { role: 'user' | 'model', text: string }[], lessonContext: string, userMessage: string) => {
   const chat = ai.chats.create({
     model: "gemini-3-flash-preview",

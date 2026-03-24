@@ -457,7 +457,7 @@ async function startServer() {
       if (!currentDb) return res.status(500).json({ error: "Firebase not initialized" });
 
       try {
-        const { title, description, content, instructor, level, instructorId } = req.body;
+        const { title, description, content, instructor, level, instructorId, topics, overallQuiz } = req.body;
         const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
         const pdfFile = files["pdf"]?.[0];
@@ -477,6 +477,8 @@ async function startServer() {
           published: false,
           createdAt: new Date().toISOString(),
           enrollmentCount: 0,
+          topics: topics ? JSON.parse(topics) : [],
+          overallQuiz: overallQuiz ? JSON.parse(overallQuiz) : null,
         };
 
         const docRef = await currentDb.collection("courses").add(courseData);
@@ -552,7 +554,7 @@ async function startServer() {
 
       try {
         const { id } = req.params;
-        const { title, description, content, instructor, level } = req.body;
+        const { title, description, content, instructor, level, topics, overallQuiz } = req.body;
         const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
         const pdfFile = files["pdf"]?.[0];
@@ -570,6 +572,8 @@ async function startServer() {
           instructor: instructor || "System",
           level: level || "Beginner",
           content: content || "",
+          topics: topics ? JSON.parse(topics) : existingData.topics || [],
+          overallQuiz: overallQuiz ? JSON.parse(overallQuiz) : existingData.overallQuiz || null,
           updatedAt: new Date().toISOString(),
         };
 

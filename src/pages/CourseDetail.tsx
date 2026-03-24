@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { BookOpen, Sparkles, FileText, ArrowLeft, Loader2, MessageSquare, Book, Lock } from 'lucide-react';
-import { doc, getDoc, query, collection, where, getDocs, updateDoc, setDoc, serverTimestamp, addDoc } from 'firebase/firestore';
+import { BookOpen, Sparkles, FileText, ArrowLeft, Loader2, MessageSquare, Book, Lock, Play, CheckCircle, Video, HelpCircle } from 'lucide-react';
+import { doc, getDoc, query, collection, where, getDocs, updateDoc, setDoc, serverTimestamp, addDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getAITutorResponse } from '../services/aiService';
 import { QuizSection } from '../components/QuizSection';
@@ -19,6 +19,10 @@ export const CourseDetail = () => {
   const [summary, setSummary] = useState('');
   const [generatingSummary, setGeneratingSummary] = useState(false);
   const [startTime] = useState(Date.now());
+  const [activeTopic, setActiveTopic] = useState<any>(null);
+  const [completedTopics, setCompletedTopics] = useState<string[]>([]);
+  const [enrollmentId, setEnrollmentId] = useState<string | null>(null);
+  const [showQuiz, setShowQuiz] = useState<{ type: 'topic' | 'overall', data: any } | null>(null);
 
   useEffect(() => {
     const trackTime = async () => {
@@ -130,7 +134,7 @@ export const CourseDetail = () => {
         const courseData = { id: docSnap.id, ...docSnap.data() };
         setCourse(courseData);
 
-        // 2. Check Access
+        // 2. Check Access & Enrollment
         if (isAdmin) {
           setIsApproved(true);
         } else {
@@ -143,6 +147,23 @@ export const CourseDetail = () => {
           const snap = await getDocs(q);
           if (!snap.empty) {
             setIsApproved(true);
+
+            // Fetch enrollment for progress tracking
+            const qEnroll = query(
+              collection(db, 'enrollments'),
+              where('userId', '==', user.uid),
+              where('courseId', '==', id)
+            );
+
+            const unsubscribeEnroll = onSnapshot(qEnroll, (enrollSnap) => {
+              if (!enrollSnap.empty) {
+                const enrollDoc = enrollSnap.docs[0];
+                setEnrollmentId(enrollDoc.id);
+                setCompletedTopics(enrollDoc.data().completedTopics || []);
+              }
+            });
+
+            return () => unsubscribeEnroll();
           } else {
             // Not approved, redirect back to catalog
             navigate('/student/courses');
@@ -169,6 +190,22 @@ export const CourseDetail = () => {
       console.error('Summary generation failed:', error);
     } finally {
       setGeneratingSummary(false);
+    }
+  };
+
+  const markTopicComplete = async (topicId: string) => {
+    if (!enrollmentId || !course || completedTopics.includes(topicId)) return;
+
+    const newCompletedTopics = [...completedTopics, topicId];
+    const progress = Math.round((newCompletedTopics.length / (course.topics?.length || 1)) * 100);
+
+    try {
+      await updateDoc(doc(db, 'enrollments', enrollmentId), {
+        completedTopics: newCompletedTopics,
+        progress: progress
+      });
+    } catch (error) {
+      console.error('Error marking topic complete:', error);
     }
   };
 
@@ -200,15 +237,70 @@ export const CourseDetail = () => {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8">
-        {/* Main Content: PDF Viewer */}
+        {/* Main Content: Video/PDF Viewer */}
         <div className="lg:col-span-2 space-y-8">
-          <div className="bg-white/5 border border-white/10 rounded-[2rem] overflow-hidden aspect-[3/4] relative">
-            <iframe
-              src={course.pdfUrl}
-              className="w-full h-full border-none"
-              title="Course PDF"
-            />
-          </div>
+          {activeTopic ? (
+            <div className="space-y-6">
+              <div className="bg-black rounded-[2rem] overflow-hidden aspect-video relative border border-white/10 shadow-2xl">
+                {activeTopic.videoUrl ? (
+                  <iframe
+                    src={activeTopic.videoUrl.replace('watch?v=', 'embed/')}
+                    className="w-full h-full"
+                    allowFullScreen
+                    title={activeTopic.title}
+                    onLoad={() => markTopicComplete(activeTopic.id)}
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 gap-4">
+                    <Video className="w-16 h-16 opacity-20" />
+                    <p>No video available for this topic</p>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold">{activeTopic.title}</h2>
+                {activeTopic.quiz && (
+                  <button
+                    onClick={() => setShowQuiz({ type: 'topic', data: activeTopic.quiz })}
+                    className="flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition-all"
+                  >
+                    <HelpCircle className="w-5 h-5" />
+                    Take Topic Quiz
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white/5 border border-white/10 rounded-[2rem] overflow-hidden aspect-[3/4] relative">
+              <iframe
+                src={course.pdfUrl}
+                className="w-full h-full border-none"
+                title="Course PDF"
+              />
+            </div>
+          )}
+
+          {showQuiz && (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md overflow-y-auto">
+              <div className="w-full max-w-4xl my-auto">
+                <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-8 relative">
+                  <button
+                    onClick={() => setShowQuiz(null)}
+                    className="absolute top-6 right-6 text-gray-500 hover:text-white"
+                  >
+                    Close Quiz
+                  </button>
+                  <QuizSection
+                    courseId={course.id}
+                    courseTitle={showQuiz.type === 'topic' ? `Quiz: ${activeTopic?.title}` : `Overall Course Quiz: ${course.title}`}
+                    courseContent={course.content || course.description || ''}
+                    questions={showQuiz.data}
+                    onComplete={() => setShowQuiz(null)}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           {course.content && (
             <div className="p-8 rounded-[2rem] bg-white/5 border border-white/10 backdrop-blur-sm">
@@ -221,29 +313,89 @@ export const CourseDetail = () => {
               </div>
             </div>
           )}
-
-          <QuizSection
-            courseId={course.id}
-            courseTitle={course.title}
-            courseContent={course.content || course.description || ''}
-          />
         </div>
 
-        {/* Sidebar: Details & AI Summary */}
+        {/* Sidebar: Details & Topics */}
         <div className="space-y-8">
           <div className="p-8 rounded-[2rem] bg-white/5 border border-white/10 backdrop-blur-sm">
             <h1 className="text-3xl font-bold mb-4">{course.title}</h1>
-            <p className="text-gray-400 leading-relaxed mb-8">{course.description}</p>
+            <p className="text-gray-400 leading-relaxed mb-6">{course.description}</p>
 
             <div className="space-y-4">
-              <div className="flex items-center gap-3 text-sm text-gray-300">
-                <FileText className="w-5 h-5 text-indigo-400" />
-                <span>Full Course Material (PDF)</span>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-mono text-neonBlue uppercase tracking-widest">Course Progress</h3>
+                <span className="text-sm font-bold text-white">
+                  {Math.round((completedTopics.length / (course.topics?.length || 1)) * 100)}%
+                </span>
               </div>
-              <div className="flex items-center gap-3 text-sm text-gray-300">
-                <BookOpen className="w-5 h-5 text-indigo-400" />
-                <span>Self-paced Learning</span>
+              <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(completedTopics.length / (course.topics?.length || 1)) * 100}%` }}
+                  className="h-full bg-indigo-500"
+                />
               </div>
+            </div>
+          </div>
+
+          {/* Topics List */}
+          <div className="p-8 rounded-[2rem] bg-white/5 border border-white/10 backdrop-blur-sm space-y-6">
+            <h3 className="text-xl font-bold flex items-center gap-3">
+              <BookOpen className="w-6 h-6 text-indigo-400" />
+              Course Topics
+            </h3>
+            <div className="space-y-3">
+              <button
+                onClick={() => setActiveTopic(null)}
+                className={`w-full p-4 rounded-2xl border transition-all flex items-center gap-4 text-left ${!activeTopic
+                  ? 'bg-indigo-600/20 border-indigo-500 text-white'
+                  : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
+              >
+                <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <div className="font-bold text-sm">Course Material (PDF)</div>
+                  <div className="text-[10px] uppercase tracking-wider opacity-50">Reference Guide</div>
+                </div>
+              </button>
+
+              {course.topics?.map((topic: any, index: number) => (
+                <button
+                  key={topic.id}
+                  onClick={() => setActiveTopic(topic)}
+                  className={`w-full p-4 rounded-2xl border transition-all flex items-center gap-4 text-left ${activeTopic?.id === topic.id
+                    ? 'bg-indigo-600/20 border-indigo-500 text-white'
+                    : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0 relative">
+                    {completedTopics.includes(topic.id) ? (
+                      <CheckCircle className="w-5 h-5 text-neonGreen" />
+                    ) : (
+                      <Play className={`w-5 h-5 ${activeTopic?.id === topic.id ? 'text-white' : 'text-gray-500'}`} />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-bold text-sm line-clamp-1">{topic.title}</div>
+                    <div className="text-[10px] uppercase tracking-wider opacity-50">Topic {index + 1}</div>
+                  </div>
+                </button>
+              ))}
+
+              {course.overallQuiz && (
+                <button
+                  onClick={() => setShowQuiz({ type: 'overall', data: course.overallQuiz })}
+                  className="w-full p-4 rounded-2xl border border-indigo-500/30 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white transition-all flex items-center gap-4 text-left group"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center flex-shrink-0 group-hover:bg-white/20">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-bold text-sm">Final Course Quiz</div>
+                    <div className="text-[10px] uppercase tracking-wider opacity-50">Comprehensive Test</div>
+                  </div>
+                </button>
+              )}
             </div>
           </div>
 
