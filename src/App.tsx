@@ -9,6 +9,7 @@ import { AdminDashboard } from './pages/dashboards/AdminDashboard';
 import { CourseCatalog } from './pages/CourseCatalog';
 import { CourseDetail } from './pages/CourseDetail';
 import { CodePlayground } from './pages/CodePlayground';
+import { Community } from './pages/student/Community';
 
 const ProtectedRoute = ({ children, requiredRole }: { children: React.ReactNode, requiredRole?: string }) => {
   const { user, profile, loading } = useAuth();
@@ -119,6 +120,14 @@ export default function App() {
             <ProtectedRoute requiredRole="student">
               <DashboardLayout>
                 <CodePlayground />
+              </DashboardLayout>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/student/community" element={
+            <ProtectedRoute requiredRole="student">
+              <DashboardLayout>
+                <Community />
               </DashboardLayout>
             </ProtectedRoute>
           } />

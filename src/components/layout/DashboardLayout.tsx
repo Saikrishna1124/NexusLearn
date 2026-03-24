@@ -69,6 +69,7 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
     ]
     : [
       { icon: LayoutDashboard, label: 'Dashboard', path: '/student/dashboard' },
+      { icon: Globe, label: 'Community', path: '/student/community' },
       { icon: BookOpen, label: 'Browse Courses', path: '/student/courses' },
       { icon: HelpCircle, label: 'Support', path: '/student/dashboard#support' },
       { icon: GraduationCap, label: 'My Learning', path: '/student/dashboard#my-learning' },
@@ -81,7 +82,7 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
       <motion.aside
         initial={false}
         animate={{ width: isSidebarOpen ? 280 : 0 }}
-        className="bg-black/50 border-r border-white/10 backdrop-blur-xl overflow-hidden flex-shrink-0"
+        className="bg-black/50 border-r border-white/10 backdrop-blur-xl overflow-hidden flex-shrink-0 relative z-50"
       >
         <div className="w-[280px] h-full flex flex-col p-6">
           <div className="flex items-center gap-3 mb-12">
@@ -107,6 +108,15 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
                       setTimeout(() => {
                         element.scrollIntoView({ behavior: 'smooth' });
                       }, 100);
+                    } else {
+                      // If element is not found, navigate to the path first
+                      navigate(item.path);
+                      setTimeout(() => {
+                        const newElement = document.getElementById(hash);
+                        if (newElement) {
+                          newElement.scrollIntoView({ behavior: 'smooth' });
+                        }
+                      }, 500);
                     }
                   }
                 }}

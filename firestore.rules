@@ -26,6 +26,12 @@ service cloud.firestore {
     // Collection: support_messages
     // Fields: userId, userEmail, userName, subject, message, courseId, courseTitle, status, createdAt, updatedAt, replies
     //
+    // Collection: social_posts
+    // Fields: userId, userName, userPhoto, title, text, imageUrl, videoUrl, description, createdAt, likes
+    //
+    // Collection: social_replies
+    // Fields: postId, userId, userName, userPhoto, text, createdAt
+    //
     // ===============================================================
 
     // ===============================================================
@@ -93,6 +99,16 @@ service cloud.firestore {
              data.status in ['open', 'replied', 'closed'];
     }
 
+    function isValidSocialPost(data) {
+      return hasOnlyAllowedFields(['userId', 'userName', 'userPhoto', 'title', 'text', 'imageUrl', 'videoUrl', 'description', 'createdAt', 'likes']) &&
+             data.userId is string && data.userName is string && data.title is string && data.createdAt is string;
+    }
+
+    function isValidSocialReply(data) {
+      return hasOnlyAllowedFields(['postId', 'userId', 'userName', 'userPhoto', 'text', 'createdAt']) &&
+             data.postId is string && data.userId is string && data.userName is string && data.text is string && data.createdAt is string;
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -146,6 +162,20 @@ service cloud.firestore {
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId && isValidSupportMessage(request.resource.data) && request.resource.data.status == 'open';
       allow update: if isAuthenticated() && (isAdmin() || (request.auth.uid == resource.data.userId && isValidSupportMessage(request.resource.data)));
       allow delete: if isAdmin();
+    }
+
+    match /social_posts/{postId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId && isValidSocialPost(request.resource.data);
+      allow update: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin() || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes'])));
+      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+    }
+
+    match /social_replies/{replyId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId && isValidSocialReply(request.resource.data);
+      allow update: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
     }
   }
 }

@@ -384,6 +384,83 @@
         "status",
         "createdAt"
       ]
+    },
+    "SocialPost": {
+      "title": "SocialPost",
+      "description": "A post shared by a student to the community.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "userName": {
+          "type": "string"
+        },
+        "userPhoto": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "imageUrl": {
+          "type": "string"
+        },
+        "videoUrl": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "likes": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "userId",
+        "userName",
+        "title",
+        "createdAt"
+      ]
+    },
+    "SocialReply": {
+      "title": "SocialReply",
+      "description": "A reply to a social post.",
+      "type": "object",
+      "properties": {
+        "postId": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "string"
+        },
+        "userName": {
+          "type": "string"
+        },
+        "userPhoto": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "postId",
+        "userId",
+        "userName",
+        "text",
+        "createdAt"
+      ]
     }
   },
   "firestore": {
@@ -418,6 +495,14 @@
     "/support_messages/{messageId}": {
       "schema": "SupportMessage",
       "description": "Support messages between students and admins"
+    },
+    "/social_posts/{postId}": {
+      "schema": "SocialPost",
+      "description": "Community posts"
+    },
+    "/social_replies/{replyId}": {
+      "schema": "SocialReply",
+      "description": "Replies to community posts"
     }
   }
 }
