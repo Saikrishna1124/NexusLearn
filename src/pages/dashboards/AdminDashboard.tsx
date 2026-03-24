@@ -1,11 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useLocation } from 'react-router-dom';
-import { Shield, Users, BookOpen, Activity, Globe } from 'lucide-react';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { Shield, Users, BookOpen, Activity, Globe, PieChart as PieChartIcon } from 'lucide-react';
+import { collection, onSnapshot, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
+import {
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid
+} from 'recharts';
 import { CourseManagement } from '../../components/admin/CourseManagement';
 import { CourseRequestManagement } from '../../components/admin/CourseRequestManagement';
+
+const COLORS = ['#00d4ff', '#39ff14', '#ff00ff', '#ffae00', '#4f46e5', '#f43f5e'];
 
 export const AdminDashboard = () => {
   const location = useLocation();
@@ -15,6 +30,8 @@ export const AdminDashboard = () => {
     totalEnrollments: 0
   });
   const [students, setStudents] = useState<any[]>([]);
+  const [enrollmentData, setEnrollmentData] = useState<any[]>([]);
+  const [enrollmentTrend, setEnrollmentTrend] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,8 +64,37 @@ export const AdminDashboard = () => {
 
     // Total Enrollments listener
     const qEnrollments = query(collection(db, 'enrollments'));
-    const unsubscribeEnrollments = onSnapshot(qEnrollments, (snapshot) => {
+    const unsubscribeEnrollments = onSnapshot(qEnrollments, async (snapshot) => {
       setStats(prev => ({ ...prev, totalEnrollments: snapshot.size }));
+
+      // Calculate enrollment distribution
+      const enrollments = snapshot.docs.map(doc => doc.data());
+      const coursesSnap = await getDocs(collection(db, 'courses'));
+      const courses = coursesSnap.docs.map(doc => ({ id: doc.id, title: doc.data().title }));
+
+      const distribution = courses.map(course => {
+        const count = enrollments.filter(e => e.courseId === course.id).length;
+        return {
+          name: course.title,
+          value: count
+        };
+      }).filter(d => d.value > 0);
+
+      setEnrollmentData(distribution);
+
+      // Calculate enrollment trend
+      const trendMap: { [key: string]: number } = {};
+      enrollments.forEach(e => {
+        const date = new Date(e.enrolledAt).toLocaleDateString([], { month: 'short', day: 'numeric' });
+        trendMap[date] = (trendMap[date] || 0) + 1;
+      });
+
+      const trend = Object.entries(trendMap).map(([date, count]) => ({
+        date,
+        enrollments: count
+      })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      setEnrollmentTrend(trend);
     });
 
     return () => {
@@ -122,7 +168,98 @@ export const AdminDashboard = () => {
       <CourseRequestManagement />
 
       <div className="grid lg:grid-cols-2 gap-8">
-        {/* AI Usage Analytics - keeping as visual representation */}
+        {/* Enrollment Distribution Chart */}
+        <div className="p-8 rounded-[2rem] bg-white/5 border border-white/10 backdrop-blur-sm">
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-xl font-bold flex items-center gap-3">
+              <PieChartIcon className="w-6 h-6 text-neonBlue" />
+              Enrollment Distribution
+            </h3>
+            <div className="text-xs font-mono text-gray-500 uppercase tracking-widest">By Course</div>
+          </div>
+
+          <div className="h-[300px] w-full">
+            {enrollmentData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={enrollmentData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {enrollmentData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                    itemStyle={{ color: '#fff' }}
+                  />
+                  <Legend verticalAlign="bottom" height={36} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-gray-500 italic">
+                No enrollment data available
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Enrollment Trend Chart */}
+        <div className="p-8 rounded-[2rem] bg-white/5 border border-white/10 backdrop-blur-sm">
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-xl font-bold flex items-center gap-3">
+              <Activity className="w-6 h-6 text-neonGreen" />
+              Enrollment Trend
+            </h3>
+            <div className="text-xs font-mono text-gray-500 uppercase tracking-widest">Growth Over Time</div>
+          </div>
+
+          <div className="h-[300px] w-full">
+            {enrollmentTrend.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={enrollmentTrend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    stroke="#6b7280"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    stroke="#6b7280"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                    itemStyle={{ color: '#fff' }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="enrollments"
+                    stroke="#39ff14"
+                    strokeWidth={3}
+                    dot={{ fill: '#39ff14', strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, strokeWidth: 0 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-gray-500 italic">
+                No trend data available
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="p-8 rounded-3xl bg-white/5 border border-white/10" id="registered-students">
           <h3 className="text-xl font-bold mb-6">Registered Students</h3>
           <div className="overflow-x-auto">

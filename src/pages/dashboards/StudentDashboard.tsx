@@ -28,7 +28,14 @@ import {
   Tooltip,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  BarChart,
+  Bar
 } from 'recharts';
 
 const StatCard = ({ icon: Icon, label, value, color }: { icon: any, label: string, value: string | number, color: string }) => (
@@ -49,6 +56,7 @@ const StatCard = ({ icon: Icon, label, value, color }: { icon: any, label: strin
 export const StudentDashboard = () => {
   const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
+  const [quizResults, setQuizResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { user, profile } = useAuth();
   const navigate = useNavigate();
@@ -139,9 +147,29 @@ export const StudentDashboard = () => {
       setSessions(sessionsData);
     });
 
+    // Fetch quiz results for performance chart
+    const qQuiz = query(
+      collection(db, 'quiz_results'),
+      where('userId', '==', user.uid),
+      orderBy('completedAt', 'asc')
+    );
+
+    const unsubscribeQuiz = onSnapshot(qQuiz, (snapshot) => {
+      const results = snapshot.docs.map(d => {
+        const data = d.data();
+        return {
+          date: new Date(data.completedAt).toLocaleDateString([], { month: 'short', day: 'numeric' }),
+          score: Math.round((data.score / data.totalQuestions) * 100),
+          fullDate: data.completedAt
+        };
+      });
+      setQuizResults(results);
+    });
+
     return () => {
       unsubscribeEnroll();
       unsubscribeSessions();
+      unsubscribeQuiz();
     };
   }, [user]);
 
@@ -283,6 +311,150 @@ export const StudentDashboard = () => {
           value={`${stats.learningHours}h`}
           color="bg-purple-500/20 text-purple-400"
         />
+      </div>
+
+      {/* Course Progress Breakdown */}
+      {enrolledCourses.length > 0 && (
+        <div className="p-8 rounded-[3rem] bg-white/5 border border-white/10 backdrop-blur-sm">
+          <h2 className="text-2xl font-bold mb-8 flex items-center gap-3">
+            <Activity className="text-indigo-500" />
+            Course Progress Breakdown
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8">
+            {enrolledCourses.map((course) => {
+              const data = [
+                { name: 'Completed', value: course.progress || 0, fill: '#4f46e5' },
+                { name: 'Remaining', value: 100 - (course.progress || 0), fill: 'rgba(255, 255, 255, 0.05)' }
+              ];
+              return (
+                <div key={course.id} className="flex flex-col items-center gap-4">
+                  <div className="relative w-32 h-32">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={data}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={40}
+                          outerRadius={55}
+                          paddingAngle={0}
+                          dataKey="value"
+                          startAngle={90}
+                          endAngle={-270}
+                        >
+                          {data.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.fill} stroke="none" />
+                          ))}
+                        </Pie>
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-xl font-bold text-white">{course.progress || 0}%</span>
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-sm font-bold text-white line-clamp-1">{course.title}</div>
+                    <div className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Completion</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Advanced Analytics */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+        {/* Quiz Performance Trend */}
+        <div className="p-8 rounded-[3rem] bg-white/5 border border-white/10 backdrop-blur-sm">
+          <h2 className="text-2xl font-bold mb-8 flex items-center gap-3">
+            <Trophy className="text-amber-500" />
+            Quiz Performance Trend
+          </h2>
+          <div className="h-[300px] w-full">
+            {quizResults.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={quizResults}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    stroke="#6b7280"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    stroke="#6b7280"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    domain={[0, 100]}
+                    tickFormatter={(value) => `${value}%`}
+                  />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                    itemStyle={{ color: '#fff' }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="score"
+                    stroke="#4f46e5"
+                    strokeWidth={3}
+                    dot={{ fill: '#4f46e5', strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, strokeWidth: 0 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-gray-500 italic">
+                Complete your first quiz to see performance trends
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Learning Activity Timeline */}
+        <div className="p-8 rounded-[3rem] bg-white/5 border border-white/10 backdrop-blur-sm">
+          <h2 className="text-2xl font-bold mb-8 flex items-center gap-3">
+            <Clock className="text-indigo-500" />
+            Learning Activity
+          </h2>
+          <div className="h-[300px] w-full">
+            {sessions.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={[...sessions].reverse().map(s => ({
+                  date: new Date(s.startTime).toLocaleDateString([], { month: 'short', day: 'numeric' }),
+                  minutes: Math.round(s.durationSeconds / 60)
+                }))}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    stroke="#6b7280"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    stroke="#6b7280"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(value) => `${value}m`}
+                  />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                    itemStyle={{ color: '#fff' }}
+                  />
+                  <Bar dataKey="minutes" fill="#4f46e5" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-gray-500 italic">
+                Start learning to track your activity
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Main Content Grid */}
