@@ -8,10 +8,12 @@ import {
   Loader2,
   Trophy,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Sparkles,
+  Play
 } from 'lucide-react';
-import { generateQuizQuestions } from '../services/aiService';
-import { collection, addDoc, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { generateQuizQuestions, generateTopicQuiz } from '../services/aiService';
+import { collection, addDoc, query, where, getDocs, orderBy, limit, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 
@@ -26,14 +28,17 @@ interface QuizSectionProps {
   courseId: string;
   courseTitle: string;
   courseContent: string;
+  enrollmentId?: string | null;
+  topicTitle?: string;
   questions?: Question[];
   onComplete?: (score: number, total: number) => void;
 }
 
-export const QuizSection: React.FC<QuizSectionProps> = ({ courseId, courseTitle, courseContent, questions, onComplete }) => {
+export const QuizSection: React.FC<QuizSectionProps> = ({ courseId, courseTitle, courseContent, enrollmentId, topicTitle, questions, onComplete }) => {
   const { user } = useAuth();
   const [quiz, setQuiz] = useState<Question[] | null>(questions || null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
@@ -66,18 +71,29 @@ export const QuizSection: React.FC<QuizSectionProps> = ({ courseId, courseTitle,
 
   const startQuiz = async () => {
     setLoading(true);
+    setError(null);
     try {
-      // Use course content if available, otherwise fallback to title/description
-      const contentForAI = courseContent || `Course Title: ${courseTitle}`;
-      const questions = await generateQuizQuestions(contentForAI);
-      setQuiz(questions);
+      let generatedQuestions;
+      if (topicTitle) {
+        generatedQuestions = await generateTopicQuiz(topicTitle, courseContent);
+      } else {
+        const contentForAI = courseContent || `Course Title: ${courseTitle}`;
+        generatedQuestions = await generateQuizQuestions(contentForAI);
+      }
+
+      if (!generatedQuestions || !Array.isArray(generatedQuestions) || generatedQuestions.length === 0) {
+        throw new Error("Invalid quiz format received from AI");
+      }
+
+      setQuiz(generatedQuestions);
       setCurrentQuestionIndex(0);
       setScore(0);
       setShowResults(false);
       setIsAnswered(false);
       setSelectedOption(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to generate quiz:', error);
+      setError(error.message || "AI failed to generate a quiz. This can happen if the course content is too brief or if there's a connection issue. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -122,6 +138,15 @@ export const QuizSection: React.FC<QuizSectionProps> = ({ courseId, courseTitle,
         completedAt: new Date().toISOString(),
       };
       await addDoc(collection(db, 'quiz_results'), result);
+
+      // Update enrollment grade if enrollmentId is provided
+      if (enrollmentId) {
+        const percentage = Math.round((score / quiz!.length) * 100);
+        await updateDoc(doc(db, 'enrollments', enrollmentId), {
+          grade: percentage
+        });
+      }
+
       setPreviousResult(result);
     } catch (error) {
       console.error('Error saving quiz result:', error);
@@ -130,15 +155,45 @@ export const QuizSection: React.FC<QuizSectionProps> = ({ courseId, courseTitle,
 
   if (loading) {
     return (
-      <div className="p-8 rounded-[2rem] bg-white/5 border border-white/10 flex flex-col items-center justify-center gap-4 min-h-[300px]">
-        <Loader2 className="w-12 h-12 animate-spin text-indigo-500" />
-        <p className="text-gray-400 animate-pulse">AI is crafting a personalized quiz for you...</p>
+      <div className="p-8 rounded-[2rem] bg-white/5 border border-white/10 flex flex-col items-center justify-center gap-6 min-h-[400px]">
+        <div className="relative">
+          <div className="w-20 h-20 border-4 border-indigo-500/20 rounded-full" />
+          <div className="absolute top-0 left-0 w-20 h-20 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <Brain className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 text-indigo-400" />
+        </div>
+        <div className="text-center space-y-2">
+          <h4 className="text-xl font-bold text-white">Nexus AI is Thinking...</h4>
+          <p className="text-gray-400 animate-pulse max-w-xs">Crafting a personalized quiz based on {topicTitle ? `"${topicTitle}"` : 'the course material'}...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8 rounded-[2rem] bg-rose-500/5 border border-rose-500/20 text-center space-y-6 min-h-[300px] flex flex-col items-center justify-center">
+        <div className="w-16 h-16 bg-rose-500/20 rounded-full flex items-center justify-center">
+          <AlertCircle className="w-8 h-8 text-rose-400" />
+        </div>
+        <div className="space-y-2">
+          <h3 className="text-xl font-bold text-white">Generation Failed</h3>
+          <p className="text-gray-400 max-w-md mx-auto">{error}</p>
+        </div>
+        <button
+          onClick={startQuiz}
+          className="px-8 py-3 bg-white text-black rounded-xl font-bold hover:bg-gray-200 transition-all flex items-center gap-2"
+        >
+          <RefreshCw className="w-5 h-5" />
+          Try Again
+        </button>
       </div>
     );
   }
 
   if (showResults) {
     const percentage = Math.round((score / quiz!.length) * 100);
+    const isPerfect = score === quiz!.length;
+
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
@@ -148,9 +203,19 @@ export const QuizSection: React.FC<QuizSectionProps> = ({ courseId, courseTitle,
         <div className="w-20 h-20 bg-indigo-600/20 rounded-full flex items-center justify-center mx-auto">
           <Trophy className="w-10 h-10 text-indigo-400" />
         </div>
-        <div>
-          <h3 className="text-2xl font-bold mb-2">Quiz Completed!</h3>
+        <div className="space-y-2">
+          <h3 className="text-2xl font-bold">Quiz Completed!</h3>
           <p className="text-gray-400">You scored {score} out of {quiz!.length}</p>
+          <div className="text-4xl font-black text-white mt-4">{percentage}%</div>
+          {isPerfect && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-4 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 font-bold mt-4 italic"
+            >
+              "Are you even human? 0 mistakes. if you're a supercomputer just admit it."
+            </motion.div>
+          )}
         </div>
 
         <div className="relative h-4 bg-white/5 rounded-full overflow-hidden max-w-md mx-auto">
@@ -285,9 +350,14 @@ export const QuizSection: React.FC<QuizSectionProps> = ({ courseId, courseTitle,
           <Brain className="w-12 h-12 text-indigo-400" />
         </div>
         <div className="flex-1 text-center md:text-left">
-          <h3 className="text-2xl font-bold mb-2">AI Knowledge Check</h3>
+          <h3 className="text-2xl font-bold mb-2">
+            {questions ? 'Knowledge Check Ready' : 'AI Knowledge Check'}
+          </h3>
           <p className="text-gray-400 mb-6">
-            Ready to test your understanding? Our AI will generate a unique quiz based on the course material.
+            {questions
+              ? `A pre-made quiz is available for ${topicTitle ? `"${topicTitle}"` : 'this section'}. You can also generate a new one using AI.`
+              : 'Ready to test your understanding? Our AI will generate a unique quiz based on the course material.'
+            }
           </p>
 
           {previousResult && (
@@ -297,36 +367,34 @@ export const QuizSection: React.FC<QuizSectionProps> = ({ courseId, courseTitle,
             </div>
           )}
 
-          <button
-            onClick={startQuiz}
-            className="w-full md:w-auto px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-600/20"
-          >
-            <Sparkles className="w-5 h-5" />
-            Generate & Start Quiz
-          </button>
+          <div className="flex flex-col sm:flex-row gap-4">
+            {questions && (
+              <button
+                onClick={() => {
+                  setQuiz(questions);
+                  setCurrentQuestionIndex(0);
+                  setScore(0);
+                  setShowResults(false);
+                  setIsAnswered(false);
+                  setSelectedOption(null);
+                }}
+                className="px-8 py-4 bg-white text-black rounded-2xl font-bold flex items-center justify-center gap-2 transition-all hover:bg-gray-200"
+              >
+                <Play className="w-5 h-5 fill-black" />
+                Start Provided Quiz
+              </button>
+            )}
+            <button
+              onClick={startQuiz}
+              className={`px-8 py-4 ${questions ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-600/30' : 'bg-indigo-600 text-white hover:bg-indigo-700'} rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-600/20`}
+            >
+              <Sparkles className="w-5 h-5" />
+              {questions ? 'Generate New AI Quiz' : 'Generate & Start Quiz'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-const Sparkles = ({ className }: { className?: string }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
-    <path d="M5 3v4" />
-    <path d="M19 17v4" />
-    <path d="M3 5h4" />
-    <path d="M17 19h4" />
-  </svg>
-);

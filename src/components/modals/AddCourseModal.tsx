@@ -50,12 +50,13 @@ export default function AddCourseModal({ onClose, onAdd, initialInstructorName, 
       return;
     }
     setGeneratingQuiz(topic.id);
+    setError(null);
     try {
       const quiz = await generateTopicQuiz(topic.title, content || description);
       setTopics(topics.map(t => t.id === topic.id ? { ...t, quiz } : t));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to generate topic quiz:', err);
-      setError('Failed to generate quiz. Please try again.');
+      setError(err.message || 'Failed to generate quiz. Please try again.');
     } finally {
       setGeneratingQuiz(null);
     }
@@ -67,12 +68,13 @@ export default function AddCourseModal({ onClose, onAdd, initialInstructorName, 
       return;
     }
     setGeneratingQuiz('overall');
+    setError(null);
     try {
       const quiz = await generateOverallQuiz(title, content || description);
       setOverallQuiz(quiz);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to generate overall quiz:', err);
-      setError('Failed to generate overall quiz. Please try again.');
+      setError(err.message || 'Failed to generate overall quiz. Please try again.');
     } finally {
       setGeneratingQuiz(null);
     }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { BookOpen, Sparkles, FileText, ArrowLeft, Loader2, MessageSquare, Book, Lock, Play, CheckCircle, Video, HelpCircle } from 'lucide-react';
@@ -23,6 +23,62 @@ export const CourseDetail = () => {
   const [completedTopics, setCompletedTopics] = useState<string[]>([]);
   const [enrollmentId, setEnrollmentId] = useState<string | null>(null);
   const [showQuiz, setShowQuiz] = useState<{ type: 'topic' | 'overall', data: any } | null>(null);
+  const playerRef = useRef<any>(null);
+
+  useEffect(() => {
+    // Load YouTube IFrame API
+    if (!window.hasOwnProperty('YT')) {
+      const tag = document.createElement('script');
+      tag.src = "https://www.youtube.com/iframe_api";
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+    }
+  }, []);
+
+  useEffect(() => {
+    let player: any = null;
+
+    const initPlayer = () => {
+      if (activeTopic?.videoUrl && window.hasOwnProperty('YT') && (window as any).YT.Player) {
+        const videoId = activeTopic.videoUrl.split('v=')[1]?.split('&')[0];
+        if (videoId) {
+          player = new (window as any).YT.Player('youtube-player', {
+            height: '100%',
+            width: '100%',
+            videoId: videoId,
+            playerVars: {
+              'autoplay': 0,
+              'modestbranding': 1,
+              'rel': 0
+            },
+            events: {
+              'onStateChange': (event: any) => {
+                if (event.data === (window as any).YT.PlayerState.ENDED) {
+                  markTopicComplete(activeTopic.id);
+                }
+              }
+            }
+          });
+          playerRef.current = player;
+        }
+      }
+    };
+
+    // If API is already loaded, init immediately
+    if (window.hasOwnProperty('YT') && (window as any).YT.Player) {
+      initPlayer();
+    } else {
+      // Wait for API to be ready
+      (window as any).onYouTubeIframeAPIReady = initPlayer;
+    }
+
+    return () => {
+      if (playerRef.current && playerRef.current.destroy) {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
+    };
+  }, [activeTopic]);
 
   useEffect(() => {
     const trackTime = async () => {
@@ -243,13 +299,7 @@ export const CourseDetail = () => {
             <div className="space-y-6">
               <div className="bg-black rounded-[2rem] overflow-hidden aspect-video relative border border-white/10 shadow-2xl">
                 {activeTopic.videoUrl ? (
-                  <iframe
-                    src={activeTopic.videoUrl.replace('watch?v=', 'embed/')}
-                    className="w-full h-full"
-                    allowFullScreen
-                    title={activeTopic.title}
-                    onLoad={() => markTopicComplete(activeTopic.id)}
-                  />
+                  <div id="youtube-player" className="w-full h-full" />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 gap-4">
                     <Video className="w-16 h-16 opacity-20" />
@@ -259,15 +309,28 @@ export const CourseDetail = () => {
               </div>
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold">{activeTopic.title}</h2>
-                {activeTopic.quiz && (
+                <div className="flex items-center gap-4">
+                  {completedTopics.includes(activeTopic.id) ? (
+                    <div className="flex items-center gap-2 px-6 py-3 rounded-xl bg-neonGreen/20 text-neonGreen font-bold">
+                      <CheckCircle className="w-5 h-5" />
+                      Completed
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => markTopicComplete(activeTopic.id)}
+                      className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white font-bold transition-all border border-white/10"
+                    >
+                      Mark as Complete
+                    </button>
+                  )}
                   <button
                     onClick={() => setShowQuiz({ type: 'topic', data: activeTopic.quiz })}
                     className="flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition-all"
                   >
                     <HelpCircle className="w-5 h-5" />
-                    Take Topic Quiz
+                    {activeTopic.quiz ? 'Take Topic Quiz' : 'Generate Topic Quiz'}
                   </button>
-                )}
+                </div>
               </div>
             </div>
           ) : (
@@ -293,7 +356,9 @@ export const CourseDetail = () => {
                   <QuizSection
                     courseId={course.id}
                     courseTitle={showQuiz.type === 'topic' ? `Quiz: ${activeTopic?.title}` : `Overall Course Quiz: ${course.title}`}
+                    topicTitle={showQuiz.type === 'topic' ? activeTopic?.title : undefined}
                     courseContent={course.content || course.description || ''}
+                    enrollmentId={enrollmentId}
                     questions={showQuiz.data}
                     onComplete={() => setShowQuiz(null)}
                   />
