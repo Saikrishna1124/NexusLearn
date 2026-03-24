@@ -282,6 +282,31 @@
         "courseId",
         "status"
       ]
+    },
+    "CourseNote": {
+      "title": "CourseNote",
+      "description": "A student's private notes for a specific course.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "courseId": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "courseId",
+        "content"
+      ]
     }
   },
   "firestore": {
@@ -308,6 +333,10 @@
     "/course_requests/{requestId}": {
       "schema": "CourseRequest",
       "description": "Student course access requests"
+    },
+    "/course_notes/{noteId}": {
+      "schema": "CourseNote",
+      "description": "Student's private course notes"
     }
   }
 }

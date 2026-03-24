@@ -20,6 +20,9 @@ service cloud.firestore {
     // Collection: chats
     // Fields: userId, lessonId, messages
     //
+    // Collection: course_notes
+    // Fields: userId, courseId, content, updatedAt
+    //
     // ===============================================================
 
     // ===============================================================
@@ -76,6 +79,11 @@ service cloud.firestore {
              data.status in ['pending', 'approved', 'rejected'];
     }
 
+    function isValidCourseNote(data) {
+      return hasOnlyAllowedFields(['userId', 'courseId', 'content', 'updatedAt']) &&
+             data.userId is string && data.courseId is string && data.content is string;
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -115,6 +123,13 @@ service cloud.firestore {
       allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
       allow update, delete: if isAdmin();
+    }
+
+    match /course_notes/{noteId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId && isValidCourseNote(request.resource.data);
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId && isValidCourseNote(request.resource.data);
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
     }
   }
 }

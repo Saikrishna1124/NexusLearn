@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { BookOpen, Sparkles, FileText, ArrowLeft, Loader2, MessageSquare, Book, Lock, Play, CheckCircle, Video, HelpCircle } from 'lucide-react';
+import { BookOpen, Sparkles, FileText, ArrowLeft, Loader2, MessageSquare, Book, Lock, Play, CheckCircle, Video, HelpCircle, StickyNote } from 'lucide-react';
 import { doc, getDoc, query, collection, where, getDocs, updateDoc, setDoc, serverTimestamp, addDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getAITutorResponse } from '../services/aiService';
 import { QuizSection } from '../components/QuizSection';
+import { CourseNotes } from '../components/CourseNotes';
 import { useAuth } from '../context/AuthContext';
 import ReactMarkdown from 'react-markdown';
 
@@ -378,6 +379,10 @@ export const CourseDetail = () => {
               </div>
             </div>
           )}
+
+          <div id="course-notes">
+            <CourseNotes courseId={course.id} />
+          </div>
         </div>
 
         {/* Sidebar: Details & Topics */}
@@ -410,6 +415,22 @@ export const CourseDetail = () => {
               Course Topics
             </h3>
             <div className="space-y-3">
+              <button
+                onClick={() => {
+                  const element = document.getElementById('course-notes');
+                  element?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="w-full p-4 rounded-2xl border border-indigo-500/30 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white transition-all flex items-center gap-4 text-left group mb-4"
+              >
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center flex-shrink-0 group-hover:bg-white/20">
+                  <StickyNote className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <div className="font-bold text-sm">Course Notepad</div>
+                  <div className="text-[10px] uppercase tracking-wider opacity-50">Take Private Notes</div>
+                </div>
+              </button>
+
               <button
                 onClick={() => setActiveTopic(null)}
                 className={`w-full p-4 rounded-2xl border transition-all flex items-center gap-4 text-left ${!activeTopic
