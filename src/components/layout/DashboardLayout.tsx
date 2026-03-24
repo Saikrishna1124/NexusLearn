@@ -15,7 +15,8 @@ import {
   ArrowLeft,
   GraduationCap,
   Globe,
-  Terminal
+  Terminal,
+  HelpCircle
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { logout } from '../../firebase';
@@ -63,11 +64,13 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
       { icon: LayoutDashboard, label: 'Dashboard', path: '/admin/dashboard' },
       { icon: BookOpen, label: 'Manage Courses', path: '/admin/dashboard#manage-courses' },
       { icon: Bell, label: 'Course Requests', path: '/admin/dashboard#course-requests' },
+      { icon: HelpCircle, label: 'Support Tickets', path: '/admin/dashboard#support-management' },
       { icon: GraduationCap, label: 'Student View', path: '/admin/dashboard#registered-students' },
     ]
     : [
       { icon: LayoutDashboard, label: 'Dashboard', path: '/student/dashboard' },
       { icon: BookOpen, label: 'Browse Courses', path: '/student/courses' },
+      { icon: HelpCircle, label: 'Support', path: '/student/dashboard#support' },
       { icon: GraduationCap, label: 'My Learning', path: '/student/dashboard#my-learning' },
       { icon: Terminal, label: 'Code Playground', path: '/student/playground' },
     ];
@@ -146,14 +149,6 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
               <ArrowLeft className="w-4 h-4" />
               Back
             </button>
-            <div className="relative hidden md:block">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-              <input
-                type="text"
-                placeholder="Search courses..."
-                className="bg-white/5 border border-white/10 rounded-full pl-10 pr-4 py-2 text-sm focus:border-indigo-500 outline-none transition-all w-64"
-              />
-            </div>
           </div>
 
           <div className="flex items-center gap-6">

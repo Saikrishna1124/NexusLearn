@@ -38,6 +38,8 @@ import {
   Bar
 } from 'recharts';
 
+import { SupportSection } from '../../components/support/SupportSection';
+
 const StatCard = ({ icon: Icon, label, value, color }: { icon: any, label: string, value: string | number, color: string }) => (
   <motion.div
     whileHover={{ y: -5 }}
@@ -648,6 +650,8 @@ export const StudentDashboard = () => {
           </div>
         </div>
       </div>
+      <div id="support" />
+      <SupportSection />
     </div>
   );
 };

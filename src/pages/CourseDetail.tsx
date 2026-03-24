@@ -250,6 +250,16 @@ export const CourseDetail = () => {
     }
   };
 
+  const contactSupport = () => {
+    const event = new CustomEvent('openSupportChat', {
+      detail: {
+        courseId: id,
+        courseTitle: course?.title
+      }
+    });
+    window.dispatchEvent(event);
+  };
+
   const markTopicComplete = async (topicId: string) => {
     if (!enrollmentId || !course || completedTopics.includes(topicId)) return;
 
@@ -551,6 +561,23 @@ export const CourseDetail = () => {
             <div className="p-4 rounded-xl bg-black/30 border border-white/5 text-xs text-gray-500 italic">
               Tip: Ask "What are the main prerequisites for this course?"
             </div>
+          </div>
+
+          <div className="p-8 rounded-[2rem] bg-white/5 border border-white/10">
+            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <HelpCircle className="w-5 h-5 text-indigo-400" />
+              Need Help?
+            </h3>
+            <p className="text-gray-400 text-sm mb-6">
+              If you have any questions or problems with this course, feel free to contact our support team.
+            </p>
+            <button
+              onClick={contactSupport}
+              className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold transition-all border border-white/10 flex items-center justify-center gap-2"
+            >
+              <MessageSquare className="w-5 h-5" />
+              Contact Support
+            </button>
           </div>
         </div>
       </div>

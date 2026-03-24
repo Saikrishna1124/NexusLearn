@@ -23,6 +23,9 @@ service cloud.firestore {
     // Collection: course_notes
     // Fields: userId, courseId, content, updatedAt
     //
+    // Collection: support_messages
+    // Fields: userId, userEmail, userName, subject, message, courseId, courseTitle, status, createdAt, updatedAt, replies
+    //
     // ===============================================================
 
     // ===============================================================
@@ -84,6 +87,12 @@ service cloud.firestore {
              data.userId is string && data.courseId is string && data.content is string;
     }
 
+    function isValidSupportMessage(data) {
+      return hasOnlyAllowedFields(['userId', 'userEmail', 'userName', 'subject', 'message', 'courseId', 'courseTitle', 'status', 'createdAt', 'updatedAt', 'replies']) &&
+             data.userId is string && data.subject is string && data.message is string &&
+             data.status in ['open', 'replied', 'closed'];
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -130,6 +139,13 @@ service cloud.firestore {
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId && isValidCourseNote(request.resource.data);
       allow update: if isAuthenticated() && request.auth.uid == resource.data.userId && isValidCourseNote(request.resource.data);
       allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    match /support_messages/{messageId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId && isValidSupportMessage(request.resource.data) && request.resource.data.status == 'open';
+      allow update: if isAuthenticated() && (isAdmin() || (request.auth.uid == resource.data.userId && isValidSupportMessage(request.resource.data)));
+      allow delete: if isAdmin();
     }
   }
 }

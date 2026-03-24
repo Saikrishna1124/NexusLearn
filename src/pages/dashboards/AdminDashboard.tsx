@@ -19,6 +19,7 @@ import {
 } from 'recharts';
 import { CourseManagement } from '../../components/admin/CourseManagement';
 import { CourseRequestManagement } from '../../components/admin/CourseRequestManagement';
+import { SupportManagement } from '../../components/admin/SupportManagement';
 
 const COLORS = ['#00d4ff', '#39ff14', '#ff00ff', '#ffae00', '#4f46e5', '#f43f5e'];
 
@@ -166,6 +167,8 @@ export const AdminDashboard = () => {
       <CourseManagement />
 
       <CourseRequestManagement />
+
+      <SupportManagement />
 
       <div className="grid lg:grid-cols-2 gap-8">
         {/* Enrollment Distribution Chart */}
