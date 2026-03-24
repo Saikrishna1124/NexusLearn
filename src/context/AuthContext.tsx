@@ -36,7 +36,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           const isAdminEmail = firebaseUser.email === 'admin@gmail.com' || firebaseUser.email === 'saikrishnagummadidala34@gmail.com';
           const isStudentEmail = firebaseUser.email === 'student@gmail.com';
-          
+
           if (userDoc.exists()) {
             const data = userDoc.data() as UserProfile;
             // Force roles for specific emails

@@ -62,12 +62,12 @@ export const LessonPlayer = ({ lesson, onClose }: { lesson: any, onClose: () => 
                 <Play className="w-8 h-8 fill-white" />
               </button>
             </div>
-            
+
             <div className="prose prose-invert max-w-none">
               <h1 className="text-3xl font-bold mb-6">Introduction to Neural Architectures</h1>
               <p className="text-gray-400 leading-relaxed mb-6">
-                In this lesson, we explore the fundamental building blocks of modern neural networks. 
-                We'll cover perceptrons, activation functions, and the backpropagation algorithm that allows 
+                In this lesson, we explore the fundamental building blocks of modern neural networks.
+                We'll cover perceptrons, activation functions, and the backpropagation algorithm that allows
                 machines to learn from data.
               </p>
               <div className="p-6 rounded-2xl bg-indigo-600/5 border border-indigo-600/20 mb-8">
@@ -104,7 +104,7 @@ export const LessonPlayer = ({ lesson, onClose }: { lesson: any, onClose: () => 
               <p className="text-gray-400 text-sm">Ask me anything about this lesson!</p>
             </div>
           )}
-          
+
           {messages.map((msg, i) => (
             <motion.div
               key={i}
@@ -112,16 +112,15 @@ export const LessonPlayer = ({ lesson, onClose }: { lesson: any, onClose: () => 
               animate={{ opacity: 1, y: 0 }}
               className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
-              <div className={`max-w-[85%] p-4 rounded-2xl ${
-                msg.role === 'user' 
-                  ? 'bg-indigo-600 text-white rounded-tr-none' 
+              <div className={`max-w-[85%] p-4 rounded-2xl ${msg.role === 'user'
+                  ? 'bg-indigo-600 text-white rounded-tr-none'
                   : 'bg-white/5 border border-white/10 text-gray-200 rounded-tl-none'
-              }`}>
+                }`}>
                 <p className="text-sm leading-relaxed">{msg.text}</p>
               </div>
             </motion.div>
           ))}
-          
+
           {loading && (
             <div className="flex justify-start">
               <div className="bg-white/5 border border-white/10 p-4 rounded-2xl rounded-tl-none">

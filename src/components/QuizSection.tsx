@@ -32,9 +32,19 @@ interface QuizSectionProps {
   topicTitle?: string;
   questions?: Question[];
   onComplete?: (score: number, total: number) => void;
+  onClose?: () => void;
 }
 
-export const QuizSection: React.FC<QuizSectionProps> = ({ courseId, courseTitle, courseContent, enrollmentId, topicTitle, questions, onComplete }) => {
+export const QuizSection: React.FC<QuizSectionProps> = ({
+  courseId,
+  courseTitle,
+  courseContent,
+  enrollmentId,
+  topicTitle,
+  questions,
+  onComplete,
+  onClose
+}) => {
   const { user } = useAuth();
   const [quiz, setQuiz] = useState<Question[] | null>(questions || null);
   const [loading, setLoading] = useState(false);
@@ -235,7 +245,10 @@ export const QuizSection: React.FC<QuizSectionProps> = ({ courseId, courseTitle,
             Try Again
           </button>
           <button
-            onClick={() => setQuiz(null)}
+            onClick={() => {
+              if (onClose) onClose();
+              setQuiz(null);
+            }}
             className="px-8 py-3 bg-white/5 hover:bg-white/10 rounded-xl font-bold transition-all"
           >
             Close Quiz
@@ -275,14 +288,14 @@ export const QuizSection: React.FC<QuizSectionProps> = ({ courseId, courseTitle,
                 onClick={() => handleOptionSelect(idx)}
                 disabled={isAnswered}
                 className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center justify-between ${selectedOption === idx
-                    ? isAnswered
-                      ? idx === currentQuestion.correctAnswerIndex
-                        ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
-                        : 'bg-rose-500/10 border-rose-500 text-rose-400'
-                      : 'bg-indigo-600/10 border-indigo-500 text-indigo-400'
-                    : isAnswered && idx === currentQuestion.correctAnswerIndex
+                  ? isAnswered
+                    ? idx === currentQuestion.correctAnswerIndex
                       ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
-                      : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                      : 'bg-rose-500/10 border-rose-500 text-rose-400'
+                    : 'bg-indigo-600/10 border-indigo-500 text-indigo-400'
+                  : isAnswered && idx === currentQuestion.correctAnswerIndex
+                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
+                    : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
                   }`}
               >
                 <span>{option}</span>
@@ -299,8 +312,8 @@ export const QuizSection: React.FC<QuizSectionProps> = ({ courseId, courseTitle,
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               className={`p-6 rounded-2xl border ${selectedOption === currentQuestion.correctAnswerIndex
-                  ? 'bg-emerald-500/5 border-emerald-500/20'
-                  : 'bg-rose-500/5 border-rose-500/20'
+                ? 'bg-emerald-500/5 border-emerald-500/20'
+                : 'bg-rose-500/5 border-rose-500/20'
                 }`}
             >
               <div className="flex items-start gap-3">

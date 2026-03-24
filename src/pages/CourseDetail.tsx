@@ -360,7 +360,7 @@ export const CourseDetail = () => {
                     courseContent={course.content || course.description || ''}
                     enrollmentId={enrollmentId}
                     questions={showQuiz.data}
-                    onComplete={() => setShowQuiz(null)}
+                    onClose={() => setShowQuiz(null)}
                   />
                 </div>
               </div>

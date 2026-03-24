@@ -77,28 +77,18 @@ export const StudentDashboard = () => {
   useEffect(() => {
     if (!user) return;
 
-    // Fetch approved course requests
-    const qReq = query(
-      collection(db, 'course_requests'),
-      where('userId', '==', user.uid),
-      where('status', '==', 'approved')
+    // Fetch enrollments for real-time updates
+    const qEnroll = query(
+      collection(db, 'enrollments'),
+      where('userId', '==', user.uid)
     );
 
-    const unsubscribeReq = onSnapshot(qReq, async (snapshot) => {
+    const unsubscribeEnroll = onSnapshot(qEnroll, async (snapshot) => {
       const coursesData = await Promise.all(
-        snapshot.docs.map(async (requestDoc) => {
-          const request = requestDoc.data();
-          const courseDoc = await getDoc(doc(db, 'courses', request.courseId));
+        snapshot.docs.map(async (enrollDoc) => {
+          const enrollment = enrollDoc.data();
+          const courseDoc = await getDoc(doc(db, 'courses', enrollment.courseId));
           if (!courseDoc.exists()) return null;
-
-          // Try to find enrollment for progress
-          const qEnroll = query(
-            collection(db, 'enrollments'),
-            where('userId', '==', user.uid),
-            where('courseId', '==', request.courseId)
-          );
-          const enrollSnap = await getDocs(qEnroll);
-          const enrollment = !enrollSnap.empty ? enrollSnap.docs[0].data() : { progress: 0, grade: 0, timeSpent: '0s' };
 
           return {
             id: courseDoc.id,
@@ -106,7 +96,7 @@ export const StudentDashboard = () => {
             progress: enrollment.progress || 0,
             grade: enrollment.grade || 0,
             timeSpent: enrollment.timeSpent || '0s',
-            enrolledAt: request.requestedAt
+            enrolledAt: enrollment.enrolledAt
           };
         })
       );
@@ -127,17 +117,13 @@ export const StudentDashboard = () => {
 
       setLoading(false);
 
-      // Fetch recommended (not requested/approved) courses
+      // Fetch recommended (not enrolled) courses
       const qCourses = query(collection(db, 'courses'), where('published', '==', true));
       const coursesSnap = await getDocs(qCourses);
       const allCourses = coursesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      // Fetch all user requests to filter out
-      const qAllReq = query(collection(db, 'course_requests'), where('userId', '==', user.uid));
-      const allReqSnap = await getDocs(qAllReq);
-      const requestedIds = allReqSnap.docs.map(d => d.data().courseId);
-
-      setRecommendedCourses(allCourses.filter(c => !requestedIds.includes(c.id)).slice(0, 3));
+      const enrolledIds = validCourses.map(c => c.id);
+      setRecommendedCourses(allCourses.filter(c => !enrolledIds.includes(c.id)).slice(0, 3));
     });
 
     // Fetch recent sessions
@@ -154,7 +140,7 @@ export const StudentDashboard = () => {
     });
 
     return () => {
-      unsubscribeReq();
+      unsubscribeEnroll();
       unsubscribeSessions();
     };
   }, [user]);
