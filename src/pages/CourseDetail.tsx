@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { BookOpen, Sparkles, FileText, ArrowLeft, Loader2, MessageSquare, Book, Lock, Play, CheckCircle, Video, HelpCircle, StickyNote } from 'lucide-react';
-import { doc, getDoc, query, collection, where, getDocs, updateDoc, setDoc, serverTimestamp, addDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, query, collection, where, getDocs, updateDoc, setDoc, serverTimestamp, addDoc, onSnapshot, increment } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getAITutorResponse } from '../services/aiService';
 import { QuizSection } from '../components/QuizSection';
@@ -178,18 +178,31 @@ export const CourseDetail = () => {
   }, [id, user, isAdmin, startTime]);
 
   useEffect(() => {
+    let unsubscribeCourse: (() => void) | null = null;
+    let unsubscribeEnroll: (() => void) | null = null;
+
     const fetchCourseAndCheckAccess = async () => {
       if (!id || !user) return;
 
       try {
-        // 1. Fetch Course
-        const docSnap = await getDoc(doc(db, 'courses', id));
-        if (!docSnap.exists()) {
-          navigate('/student/dashboard');
-          return;
-        }
-        const courseData = { id: docSnap.id, ...docSnap.data() };
-        setCourse(courseData);
+        // 1. Subscribe to Course changes
+        unsubscribeCourse = onSnapshot(doc(db, 'courses', id), (docSnap) => {
+          if (!docSnap.exists()) {
+            navigate('/student/dashboard');
+            return;
+          }
+          const courseData = { id: docSnap.id, ...docSnap.data() } as any;
+          setCourse(courseData);
+          setLoading(false);
+          
+          // Set first topic as active by default if none selected
+          if (!activeTopic && courseData.topics && courseData.topics.length > 0) {
+            setActiveTopic(courseData.topics[0]);
+          }
+        }, (error) => {
+          console.error('Error fetching course:', error);
+          navigate('/student/courses');
+        });
 
         // 2. Check Access & Enrollment
         if (isAdmin) {
@@ -212,28 +225,30 @@ export const CourseDetail = () => {
               where('courseId', '==', id)
             );
 
-            const unsubscribeEnroll = onSnapshot(qEnroll, (enrollSnap) => {
+            unsubscribeEnroll = onSnapshot(qEnroll, (enrollSnap) => {
               if (!enrollSnap.empty) {
                 const enrollDoc = enrollSnap.docs[0];
                 setEnrollmentId(enrollDoc.id);
                 setCompletedTopics(enrollDoc.data().completedTopics || []);
               }
             });
-
-            return () => unsubscribeEnroll();
           } else {
             // Not approved, redirect back to catalog
             navigate('/student/courses');
           }
         }
       } catch (error) {
-        console.error('Error fetching course or checking access:', error);
+        console.error('Error in fetchCourseAndCheckAccess:', error);
         navigate('/student/courses');
-      } finally {
-        setLoading(false);
       }
     };
+
     fetchCourseAndCheckAccess();
+
+    return () => {
+      if (unsubscribeCourse) unsubscribeCourse();
+      if (unsubscribeEnroll) unsubscribeEnroll();
+    };
   }, [id, user, isAdmin, navigate]);
 
   const generateSummary = async () => {
@@ -271,6 +286,13 @@ export const CourseDetail = () => {
         completedTopics: newCompletedTopics,
         progress: progress
       });
+
+      // Award skill points to the user
+      if (user) {
+        await updateDoc(doc(db, 'users', user.uid), {
+          skillPoints: increment(50) // 50 points per topic
+        });
+      }
     } catch (error) {
       console.error('Error marking topic complete:', error);
     }
@@ -345,12 +367,36 @@ export const CourseDetail = () => {
               </div>
             </div>
           ) : (
-            <div className="bg-white/5 border border-white/10 rounded-[2rem] overflow-hidden aspect-[3/4] relative">
-              <iframe
-                src={course.pdfUrl}
-                className="w-full h-full border-none"
-                title="Course PDF"
-              />
+            <div className="bg-white/5 border border-white/10 rounded-[2rem] overflow-hidden aspect-[3/4] relative group">
+              {course.pdfUrl ? (
+                <div className="flex flex-col items-center justify-center h-full p-12 text-center bg-white/5 backdrop-blur-sm border border-white/10 rounded-[2rem]">
+                  <div className="w-24 h-24 bg-indigo-600/20 rounded-3xl flex items-center justify-center mb-8">
+                    <FileText className="w-12 h-12 text-indigo-400" />
+                  </div>
+                  <h3 className="text-3xl font-bold text-white mb-4">Course Materials</h3>
+                  <p className="text-gray-400 mb-10 max-w-sm mx-auto leading-relaxed">
+                    Download the complete course PDF to access offline reading, assignments, and detailed explanations.
+                  </p>
+                  <a
+                    href={course.pdfUrl}
+                    download
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-5 rounded-2xl font-bold text-lg transition-all shadow-xl shadow-indigo-600/20 hover:scale-105 flex items-center gap-3"
+                  >
+                    <FileText className="w-6 h-6" />
+                    Download PDF Document
+                  </a>
+                  <div className="mt-8 text-xs text-gray-500 font-mono uppercase tracking-widest">
+                    Available in high quality PDF format
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full p-12 text-center">
+                  <FileText className="w-16 h-16 text-gray-600 mb-4 opacity-20" />
+                  <p className="text-gray-500 italic">No PDF materials currently available for this section.</p>
+                </div>
+              )}
             </div>
           )}
 

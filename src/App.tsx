@@ -1,4 +1,6 @@
 import React from 'react';
+// src/App.tsx
+import { Community } from './pages/student/Community';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LandingPage } from './pages/LandingPage';
@@ -9,7 +11,7 @@ import { AdminDashboard } from './pages/dashboards/AdminDashboard';
 import { CourseCatalog } from './pages/CourseCatalog';
 import { CourseDetail } from './pages/CourseDetail';
 import { CodePlayground } from './pages/CodePlayground';
-import { Community } from './pages/student/Community';
+
 
 const ProtectedRoute = ({ children, requiredRole }: { children: React.ReactNode, requiredRole?: string }) => {
   const { user, profile, loading } = useAuth();

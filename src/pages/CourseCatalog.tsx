@@ -107,61 +107,23 @@ export const CourseCatalog = () => {
   }
 
   return (
-    <div className="space-y-12 pb-20">
-      {/* Header Section */}
-      <div className="flex flex-col gap-8">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate('/student/dashboard')}
-              className="p-3 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <div>
-              <h1 className="text-5xl font-bold tracking-tight">
-                Explore <span className="text-neonBlue">Courses</span>
-              </h1>
-              <p className="text-gray-400 mt-2 text-lg">Discover your next learning adventure.</p>
-              {profile?.role === 'admin' && (
-                <button
-                  onClick={() => navigate('/admin/dashboard')}
-                  className="mt-2 flex items-center gap-2 text-neonBlue hover:text-white transition-colors text-sm font-bold"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  Back to Admin Dashboard
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="flex items-center gap-2 bg-neonBlue/10 border border-neonBlue/20 text-neonBlue px-6 py-3 rounded-xl font-bold hover:bg-neonBlue/20 transition-all"
-            >
-              <LayoutDashboard className="w-5 h-5" />
-              My Dashboard
-            </button>
-
-            <div className="relative group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 group-focus-within:text-neonBlue transition-colors" />
-              <input
-                type="text"
-                placeholder="Search courses..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="w-64 bg-white/5 border border-white/10 rounded-xl pl-12 pr-4 py-3 text-white focus:border-neonBlue focus:bg-white/10 outline-none transition-all"
-              />
-            </div>
-
-            <button
-              onClick={handleLogout}
-              className="p-3 bg-white/5 border border-white/10 rounded-xl hover:bg-red-500/10 hover:border-red-500/20 hover:text-red-400 transition-all"
-            >
-              <LogOut className="w-5 h-5" />
-            </button>
-          </div>
+    <div className="space-y-8 pb-20">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-4xl font-bold tracking-tight">
+            Explore <span className="text-neonBlue">Courses</span>
+          </h1>
+          <p className="text-gray-400 mt-2">Discover your next learning adventure.</p>
+        </div>
+        <div className="relative group">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 group-focus-within:text-neonBlue transition-colors" />
+          <input
+            type="text"
+            placeholder="Search courses..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-64 bg-white/5 border border-white/10 rounded-xl pl-12 pr-4 py-3 text-white focus:border-neonBlue focus:bg-white/10 outline-none transition-all"
+          />
         </div>
       </div>
 
@@ -184,6 +146,10 @@ export const CourseCatalog = () => {
                   src={course.thumbnailUrl || `https://picsum.photos/seed/${course.id}/800/500`}
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                   alt={course.title}
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${course.id}/800/500`;
+                  }}
                 />
                 {/* Badges */}
                 <div className="absolute top-4 left-4 flex gap-2">

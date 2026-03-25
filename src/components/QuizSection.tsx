@@ -13,7 +13,7 @@ import {
   Play
 } from 'lucide-react';
 import { generateQuizQuestions, generateTopicQuiz } from '../services/aiService';
-import { collection, addDoc, query, where, getDocs, orderBy, limit, updateDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, orderBy, limit, updateDoc, doc, increment } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 
@@ -157,6 +157,14 @@ export const QuizSection: React.FC<QuizSectionProps> = ({
         });
       }
 
+      // Award skill points to the user based on quiz performance
+      if (user) {
+        const pointsToAward = score * 20; // 20 points per correct answer
+        await updateDoc(doc(db, 'users', user.uid), {
+          skillPoints: increment(pointsToAward)
+        });
+      }
+
       setPreviousResult(result);
     } catch (error) {
       console.error('Error saving quiz result:', error);
@@ -288,14 +296,14 @@ export const QuizSection: React.FC<QuizSectionProps> = ({
                 onClick={() => handleOptionSelect(idx)}
                 disabled={isAnswered}
                 className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center justify-between ${selectedOption === idx
-                  ? isAnswered
-                    ? idx === currentQuestion.correctAnswerIndex
+                    ? isAnswered
+                      ? idx === currentQuestion.correctAnswerIndex
+                        ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
+                        : 'bg-rose-500/10 border-rose-500 text-rose-400'
+                      : 'bg-indigo-600/10 border-indigo-500 text-indigo-400'
+                    : isAnswered && idx === currentQuestion.correctAnswerIndex
                       ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
-                      : 'bg-rose-500/10 border-rose-500 text-rose-400'
-                    : 'bg-indigo-600/10 border-indigo-500 text-indigo-400'
-                  : isAnswered && idx === currentQuestion.correctAnswerIndex
-                    ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
-                    : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                      : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
                   }`}
               >
                 <span>{option}</span>
@@ -312,8 +320,8 @@ export const QuizSection: React.FC<QuizSectionProps> = ({
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               className={`p-6 rounded-2xl border ${selectedOption === currentQuestion.correctAnswerIndex
-                ? 'bg-emerald-500/5 border-emerald-500/20'
-                : 'bg-rose-500/5 border-rose-500/20'
+                  ? 'bg-emerald-500/5 border-emerald-500/20'
+                  : 'bg-rose-500/5 border-rose-500/20'
                 }`}
             >
               <div className="flex items-start gap-3">

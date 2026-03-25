@@ -1,15 +1,16 @@
 import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { auth, db } from '../firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 
 interface UserProfile {
   uid: string;
   email: string;
   displayName: string;
-  role: 'student' | 'instructor' | 'admin';
+  role: 'student' | 'admin';
   photoURL: string;
   createdAt: string;
+  skillPoints: number;
 }
 
 interface AuthContextType {
@@ -17,7 +18,6 @@ interface AuthContextType {
   profile: UserProfile | null;
   loading: boolean;
   isAdmin: boolean;
-  isInstructor: boolean;
   isStudent: boolean;
 }
 
@@ -29,53 +29,66 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    let unsubscribeProfile: (() => void) | null = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
         setUser(firebaseUser);
         if (firebaseUser) {
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          const isAdminEmail = firebaseUser.email === 'admin@gmail.com' || firebaseUser.email === 'saikrishnagummadidala34@gmail.com';
-          const isStudentEmail = firebaseUser.email === 'student@gmail.com';
+          // Listen for real-time profile updates
+          unsubscribeProfile = onSnapshot(doc(db, 'users', firebaseUser.uid), async (userDoc) => {
+            const isAdminEmail = firebaseUser.email === 'admin@gmail.com' ||
+              firebaseUser.email === 'saikrishnagummadidala34@gmail.com' ||
+              firebaseUser.email === '2303031460056@paruluniversity.ac.in';
+            const isStudentEmail = firebaseUser.email === 'student@gmail.com';
 
-          if (userDoc.exists()) {
-            const data = userDoc.data() as UserProfile;
-            // Force roles for specific emails
-            let updatedRole = data.role;
-            if (isAdminEmail) updatedRole = 'admin';
-            else if (isStudentEmail) updatedRole = 'student';
+            if (userDoc.exists()) {
+              const data = userDoc.data() as UserProfile;
+              let updatedRole = data.role;
+              if (isAdminEmail) updatedRole = 'admin';
+              else if (isStudentEmail) updatedRole = 'student';
 
-            if (data.role !== updatedRole) {
-              const updatedProfile = { ...data, role: updatedRole as any };
-              await setDoc(doc(db, 'users', firebaseUser.uid), updatedProfile, { merge: true });
-              setProfile(updatedProfile);
+              if (data.role !== updatedRole) {
+                const updatedProfile = { ...data, role: updatedRole as any };
+                await setDoc(doc(db, 'users', firebaseUser.uid), updatedProfile, { merge: true });
+                setProfile(updatedProfile);
+              } else {
+                setProfile(data);
+              }
             } else {
-              setProfile(data);
+              const newProfile: UserProfile = {
+                uid: firebaseUser.uid,
+                email: firebaseUser.email || '',
+                displayName: firebaseUser.displayName || (isAdminEmail ? 'Admin' : 'Student'),
+                role: isAdminEmail ? 'admin' : 'student',
+                photoURL: firebaseUser.photoURL || '',
+                createdAt: new Date().toISOString(),
+                skillPoints: 0,
+              };
+              await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
+              setProfile(newProfile);
             }
-          } else {
-            // Initial profile creation
-            const newProfile: UserProfile = {
-              uid: firebaseUser.uid,
-              email: firebaseUser.email || '',
-              displayName: firebaseUser.displayName || (isAdminEmail ? 'Admin' : 'Student'),
-              role: isAdminEmail ? 'admin' : 'student',
-              photoURL: firebaseUser.photoURL || '',
-              createdAt: new Date().toISOString(),
-            };
-            await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
-            setProfile(newProfile);
-          }
+            setLoading(false);
+          }, (error) => {
+            console.error("Profile listener error:", error);
+            setLoading(false);
+          });
         } else {
+          if (unsubscribeProfile) unsubscribeProfile();
           setProfile(null);
+          setLoading(false);
         }
       } catch (error) {
         console.error("Auth initialization error:", error);
         setProfile(null);
-      } finally {
         setLoading(false);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeProfile) unsubscribeProfile();
+    };
   }, []);
 
   const value = useMemo(() => ({
@@ -83,7 +96,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     profile,
     loading,
     isAdmin: profile?.role === 'admin',
-    isInstructor: profile?.role === 'instructor',
     isStudent: profile?.role === 'student',
   }), [user, profile, loading]);
 

@@ -39,6 +39,8 @@ import {
 } from 'recharts';
 
 import { SupportSection } from '../../components/support/SupportSection';
+import { Leaderboard } from '../../components/Student/Leaderboard';
+import { Achievements } from '../../components/Student/Achievements';
 
 const StatCard = ({ icon: Icon, label, value, color }: { icon: any, label: string, value: string | number, color: string }) => (
   <motion.div
@@ -304,7 +306,7 @@ export const StudentDashboard = () => {
         <StatCard
           icon={Target}
           label="Skill Points"
-          value={stats.totalPoints}
+          value={profile?.skillPoints || 0}
           color="bg-amber-500/20 text-amber-400"
         />
         <StatCard
@@ -459,6 +461,16 @@ export const StudentDashboard = () => {
         </div>
       </div>
 
+      <div className="grid lg:grid-cols-2 gap-8">
+        <Leaderboard />
+        <Achievements
+          enrolledCount={stats.totalCourses}
+          completedCount={stats.completedCourses}
+          quizResults={quizResults}
+          skillPoints={profile?.skillPoints || 0}
+        />
+      </div>
+
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-10">
         {/* Left Column: My Learning */}
@@ -487,9 +499,13 @@ export const StudentDashboard = () => {
                   <div className="flex flex-col sm:flex-row gap-8 items-center">
                     <div className="w-full sm:w-44 aspect-square rounded-3xl bg-indigo-600/20 overflow-hidden flex-shrink-0 relative">
                       <img
-                        src={course.thumbnailUrl}
+                        src={course.thumbnailUrl || `https://picsum.photos/seed/${course.id}/800/800`}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                         alt={course.title}
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${course.id}/800/800`;
+                        }}
                       />
                       <div className="absolute inset-0 bg-indigo-600/10 mix-blend-overlay" />
                     </div>
@@ -606,7 +622,15 @@ export const StudentDashboard = () => {
                     className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden group flex flex-col"
                   >
                     <div className="aspect-video relative overflow-hidden">
-                      <img src={course.thumbnailUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt="" />
+                      <img
+                        src={course.thumbnailUrl || `https://picsum.photos/seed/${course.id}/800/500`}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        alt=""
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${course.id}/800/500`;
+                        }}
+                      />
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4">
                         <button
                           onClick={() => requestAccess(course)}

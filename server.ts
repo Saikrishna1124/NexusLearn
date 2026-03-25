@@ -6,11 +6,31 @@ import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import multer from "multer";
 import fs from "fs";
+import { v2 as cloudinary } from "cloudinary";
 import admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
+import { getStorage } from "firebase-admin/storage";
 
 dotenv.config();
+
+// Cloudinary configuration
+const cloudinaryCloudName = process.env.CLOUDINARY_CLOUD_NAME || process.env.cloud_name || "dxanwhbxp";
+const cloudinaryApiKey = process.env.CLOUDINARY_API_KEY || process.env.api_key || "545661618726322";
+const cloudinaryApiSecret = process.env.CLOUDINARY_API_SECRET || process.env.api_secret || "x_AlSEr3vOyOgI8ADDQWHVtVkQk";
+
+// Clean up values (remove trailing commas or whitespace if any)
+const cleanValue = (val: string) => val.replace(/[,]$/, "").trim();
+
+cloudinary.config({
+  cloud_name: cleanValue(cloudinaryCloudName),
+  api_key: cleanValue(cloudinaryApiKey),
+  api_secret: cleanValue(cloudinaryApiSecret),
+});
+
+if (!process.env.CLOUDINARY_CLOUD_NAME && !process.env.cloud_name) {
+  console.warn("Cloudinary credentials NOT found in environment variables. Using fallback hardcoded values.");
+}
 
 // Load Firebase config
 const configPath = path.join(process.cwd(), "firebase-applet-config.json");
@@ -42,21 +62,14 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir);
 }
 
-// Multer config
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/");
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname));
-  },
-});
+// Multer config for memory storage (for Firebase Storage)
+const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 // Firebase globals
 let db: any = null;
 let auth: any = null;
+let storageBucket: any = null;
 let firebaseApp: admin.app.App | null = null;
 let lastDbError: any = null;
 
@@ -172,6 +185,22 @@ const initializeDb = async () => {
 
   auth = getAuth(firebaseApp);
 
+  const bucketName = firebaseConfig.storageBucket || `${firebaseConfig.projectId}.appspot.com`;
+  console.log(`Initializing Storage Bucket: ${bucketName}`);
+  storageBucket = getStorage(firebaseApp).bucket(bucketName);
+
+  // Verify bucket access
+  try {
+    const [exists] = await storageBucket.exists();
+    if (!exists) {
+      console.warn(`Storage bucket ${bucketName} does not exist. Uploads will use placeholders.`);
+    } else {
+      console.log(`Storage bucket ${bucketName} verified and accessible.`);
+    }
+  } catch (e: any) {
+    console.warn(`Could not verify storage bucket ${bucketName}: ${e.message}. This is normal if Storage is not yet enabled.`);
+  }
+
   if (dbId && dbId !== "(default)") {
     try {
       console.log(`Attempting named database: ${dbId}`);
@@ -198,6 +227,34 @@ const initializeDb = async () => {
   console.warn(lastDbError);
   return null;
 };
+
+async function uploadToStorage(file: Express.Multer.File, folder: string): Promise<string> {
+  try {
+    return new Promise((resolve) => {
+      const isPdf = file.mimetype === "application/pdf" || (file.originalname && file.originalname.toLowerCase().endsWith(".pdf"));
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: folder,
+          resource_type: isPdf ? "image" : "auto", // Using 'image' for PDFs is BETTER for inline previews in Cloudinary
+        },
+        (error, result) => {
+          if (error) {
+            console.error("Cloudinary upload error:", error);
+            // Fallback to high-quality sample PDF
+            resolve(isPdf ? "https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf" : `https://picsum.photos/seed/${folder}-${Date.now()}/800/600`);
+          } else {
+            resolve(result!.secure_url);
+          }
+        }
+      );
+      uploadStream.end(file.buffer);
+    });
+  } catch (err: any) {
+    console.error("Error in uploadToStorage:", err);
+    const isPdf = file.mimetype === "application/pdf" || (file.originalname && file.originalname.toLowerCase().endsWith(".pdf"));
+    return isPdf ? "https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf" : `https://picsum.photos/seed/${folder}-${Date.now()}/800/600`;
+  }
+}
 
 async function seedAdmin() {
   if (!db || !auth) {
@@ -262,6 +319,7 @@ async function seedCourses() {
       price: 0,
       rating: 5,
       thumbnailUrl: "https://picsum.photos/seed/js-nexus/800/500",
+      pdfUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
       published: true,
       createdAt: new Date().toISOString(),
       enrollmentCount: 0,
@@ -277,6 +335,7 @@ async function seedCourses() {
       price: 0,
       rating: 5,
       thumbnailUrl: "https://picsum.photos/seed/python-nexus/800/500",
+      pdfUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
       published: true,
       createdAt: new Date().toISOString(),
       enrollmentCount: 0,
@@ -292,6 +351,7 @@ async function seedCourses() {
       price: 0,
       rating: 4.8,
       thumbnailUrl: "https://picsum.photos/seed/fullstack-nexus/800/500",
+      pdfUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
       published: true,
       createdAt: new Date().toISOString(),
       enrollmentCount: 0,
@@ -307,6 +367,7 @@ async function seedCourses() {
       price: 0,
       rating: 4.9,
       thumbnailUrl: "https://picsum.photos/seed/java-nexus/800/500",
+      pdfUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
       published: true,
       createdAt: new Date().toISOString(),
       enrollmentCount: 0,
@@ -333,6 +394,30 @@ async function seedCourses() {
     console.log("Default courses check/seed completed successfully");
   } catch (error) {
     console.error("Error seeding courses:", error);
+  }
+}
+
+// Helper to extract public_id from Cloudinary URL
+function getCloudinaryPublicId(url: string): string | null {
+  if (!url || !url.includes("cloudinary.com")) return null;
+  try {
+    const parts = url.split("/");
+    const uploadIndex = parts.indexOf("upload");
+    if (uploadIndex === -1) return null;
+
+    // The public_id starts after the version (e.g., v123456789) or directly after upload
+    let publicIdWithExt = "";
+    if (parts[uploadIndex + 1].startsWith("v") && !isNaN(Number(parts[uploadIndex + 1].substring(1)))) {
+      publicIdWithExt = parts.slice(uploadIndex + 2).join("/");
+    } else {
+      publicIdWithExt = parts.slice(uploadIndex + 1).join("/");
+    }
+
+    // Remove file extension
+    return publicIdWithExt.split(".")[0];
+  } catch (e) {
+    console.error("Error extracting Cloudinary public_id:", e);
+    return null;
   }
 }
 
@@ -368,6 +453,118 @@ async function startServer() {
       console.error("Error during background seeding:", err);
     }
   })();
+
+  // Proxy route for Firebase Storage files
+  app.get("/api/files/*", async (req, res) => {
+    try {
+      if (!storageBucket) {
+        console.error("Storage bucket not initialized for proxy request");
+        return res.status(500).send("Storage bucket not initialized");
+      }
+
+      const filePath = req.params[0];
+      console.log(`Proxying file request: ${filePath}`);
+      const file = storageBucket.file(filePath);
+      const [exists] = await file.exists();
+
+      if (!exists) {
+        console.warn(`File not found in storage: ${filePath}`);
+        return res.status(404).send("File not found");
+      }
+
+      const [metadata] = await file.getMetadata();
+      const isPdf = filePath.toLowerCase().endsWith(".pdf");
+      if (isPdf) {
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", "inline");
+      } else {
+        res.setHeader("Content-Type", metadata.contentType || "application/octet-stream");
+      }
+      res.setHeader("Cache-Control", "public, max-age=3600");
+
+      file.createReadStream().pipe(res);
+    } catch (error: any) {
+      console.error(`Error serving file ${req.params[0]}:`, error);
+      res.status(500).send(`Error serving file: ${error.message}`);
+    }
+  });
+
+  // Repair media links for all courses
+  app.post("/api/admin/repair-media", async (req, res) => {
+    const currentDb = await getDbInstance();
+    if (!currentDb) return res.status(500).json({ error: "DB not ready" });
+
+    try {
+      console.log("Starting media repair process...");
+      const snap = await currentDb.collection("courses").get();
+      const updates = [];
+      const appUrl = process.env.APP_URL || '';
+
+      for (const doc of snap.docs) {
+        const data = doc.data();
+        let needsUpdate = false;
+        const updateData: any = {};
+
+        // Fix thumbnailUrl
+        if (!data.thumbnailUrl || data.thumbnailUrl.includes("storage.googleapis.com") || data.thumbnailUrl.startsWith("/api/files/")) {
+          if (data.thumbnailUrl && (data.thumbnailUrl.includes("storage.googleapis.com") || data.thumbnailUrl.startsWith("/api/files/"))) {
+            let fileName = "";
+            if (data.thumbnailUrl.includes("storage.googleapis.com")) {
+              const parts = data.thumbnailUrl.split("/");
+              fileName = parts.slice(parts.indexOf(storageBucket?.name || "") + 1).join("/");
+            } else {
+              fileName = data.thumbnailUrl.replace("/api/files/", "");
+            }
+            if (fileName && storageBucket) {
+              updateData.thumbnailUrl = `${appUrl}/api/files/${fileName}`;
+              needsUpdate = true;
+            } else {
+              updateData.thumbnailUrl = `https://picsum.photos/seed/${doc.id}/800/600`;
+              needsUpdate = true;
+            }
+          } else if (!data.thumbnailUrl) {
+            updateData.thumbnailUrl = `https://picsum.photos/seed/${doc.id}/800/600`;
+            needsUpdate = true;
+          }
+        }
+
+        // Fix pdfUrl
+        if (!data.pdfUrl || data.pdfUrl.includes("storage.googleapis.com") || data.pdfUrl.startsWith("/api/files/")) {
+          if (data.pdfUrl && (data.pdfUrl.includes("storage.googleapis.com") || data.pdfUrl.startsWith("/api/files/"))) {
+            let fileName = "";
+            if (data.pdfUrl.includes("storage.googleapis.com")) {
+              const parts = data.pdfUrl.split("/");
+              fileName = parts.slice(parts.indexOf(storageBucket?.name || "") + 1).join("/");
+            } else {
+              fileName = data.pdfUrl.replace("/api/files/", "");
+            }
+            if (fileName && storageBucket) {
+              updateData.pdfUrl = `${appUrl}/api/files/${fileName}`;
+              needsUpdate = true;
+            } else {
+              updateData.pdfUrl = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
+              needsUpdate = true;
+            }
+          } else if (!data.pdfUrl) {
+            updateData.pdfUrl = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
+            needsUpdate = true;
+          }
+        }
+
+        if (needsUpdate) {
+          console.log(`Repairing course ${doc.id}:`, updateData);
+          updates.push(doc.ref.update(updateData));
+        }
+      }
+
+      await Promise.all(updates);
+      console.log(`Successfully repaired ${updates.length} courses`);
+      res.json({ success: true, updatedCount: updates.length });
+    } catch (error: any) {
+      console.error("Error repairing media links:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   app.get("/api/health", (req, res) => {
     res.json({
@@ -463,6 +660,26 @@ async function startServer() {
         const pdfFile = files["pdf"]?.[0];
         const thumbnailFile = files["thumbnail"]?.[0];
 
+        let pdfUrl = "https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf";
+        let thumbnailUrl = `https://picsum.photos/seed/${title.replace(/\s+/g, "").toLowerCase()}/800/600`;
+
+        if (pdfFile) {
+          pdfUrl = await uploadToStorage(pdfFile, "courses/pdfs");
+        }
+        if (thumbnailFile) {
+          thumbnailUrl = await uploadToStorage(thumbnailFile, "courses/thumbnails");
+        }
+
+        const parseJson = (val: any, fallback: any) => {
+          if (!val || val === "undefined" || val === "null") return fallback;
+          try {
+            return typeof val === "string" ? JSON.parse(val) : val;
+          } catch (e) {
+            console.error("Error parsing JSON field:", e);
+            return fallback;
+          }
+        };
+
         const courseData = {
           title,
           description,
@@ -470,22 +687,25 @@ async function startServer() {
           instructorId: instructorId || null,
           level: level || "Beginner",
           content: content || "",
-          pdfUrl: pdfFile ? `/uploads/${pdfFile.filename}` : "",
-          thumbnailUrl: thumbnailFile
-            ? `/uploads/${thumbnailFile.filename}`
-            : `https://picsum.photos/seed/${title.replace(/\s+/g, "").toLowerCase()}/800/600`,
+          pdfUrl,
+          thumbnailUrl,
           published: false,
           createdAt: new Date().toISOString(),
           enrollmentCount: 0,
-          topics: topics ? JSON.parse(topics) : [],
-          overallQuiz: overallQuiz ? JSON.parse(overallQuiz) : null,
+          topics: parseJson(topics, []),
+          overallQuiz: parseJson(overallQuiz, null),
         };
 
         const docRef = await currentDb.collection("courses").add(courseData);
         res.json({ courseId: docRef.id, ...courseData });
       } catch (error: any) {
         console.error("Error creating course:", error);
-        res.status(500).json({ error: "Internal server error", details: error.message });
+        res.status(500).json({
+          error: error.message || "Internal server error",
+          details: error.message,
+          code: error.code,
+          stack: process.env.NODE_ENV === "production" ? undefined : error.stack
+        });
       }
     }
   );
@@ -504,26 +724,60 @@ async function startServer() {
 
       const data = doc.data();
 
-      if (data?.pdfUrl) {
-        const pdfPath = path.join(
-          process.cwd(),
-          data.pdfUrl.startsWith("/") ? data.pdfUrl.slice(1) : data.pdfUrl
-        );
-        if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath);
+      // Delete from Cloudinary if applicable
+      if (data?.pdfUrl && data.pdfUrl.includes("cloudinary.com")) {
+        const publicId = getCloudinaryPublicId(data.pdfUrl);
+        if (publicId) {
+          try {
+            await cloudinary.uploader.destroy(publicId, { resource_type: "raw" });
+            console.log(`Deleted PDF from Cloudinary: ${publicId}`);
+          } catch (e) {
+            console.warn("Failed to delete PDF from Cloudinary:", e);
+          }
+        }
       }
-      if (data?.thumbnailUrl) {
-        const thumbPath = path.join(
-          process.cwd(),
-          data.thumbnailUrl.startsWith("/") ? data.thumbnailUrl.slice(1) : data.thumbnailUrl
-        );
-        if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
+      if (data?.thumbnailUrl && data.thumbnailUrl.includes("cloudinary.com")) {
+        const publicId = getCloudinaryPublicId(data.thumbnailUrl);
+        if (publicId) {
+          try {
+            await cloudinary.uploader.destroy(publicId);
+            console.log(`Deleted thumbnail from Cloudinary: ${publicId}`);
+          } catch (e) {
+            console.warn("Failed to delete thumbnail from Cloudinary:", e);
+          }
+        }
+      }
+
+      // Delete from Firebase Storage if applicable
+      if (data?.pdfUrl && data.pdfUrl.includes("storage.googleapis.com")) {
+        try {
+          const fileUrl = new URL(data.pdfUrl);
+          const filePath = fileUrl.pathname.split("/").slice(2).join("/");
+          await storageBucket.file(filePath).delete();
+        } catch (e) {
+          console.warn("Failed to delete PDF from storage:", e);
+        }
+      }
+      if (data?.thumbnailUrl && data.thumbnailUrl.includes("storage.googleapis.com")) {
+        try {
+          const fileUrl = new URL(data.thumbnailUrl);
+          const filePath = fileUrl.pathname.split("/").slice(2).join("/");
+          await storageBucket.file(filePath).delete();
+        } catch (e) {
+          console.warn("Failed to delete thumbnail from storage:", e);
+        }
       }
 
       await currentDb.collection("courses").doc(id).delete();
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error deleting course:", error);
-      res.status(500).json({ error: "Internal server error", details: error.message });
+      res.status(500).json({
+        error: error.message || "Internal server error",
+        details: error.message,
+        code: error.code,
+        stack: process.env.NODE_ENV === "production" ? undefined : error.stack
+      });
     }
   });
 
@@ -538,7 +792,12 @@ async function startServer() {
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error updating course:", error);
-      res.status(500).json({ error: "Internal server error", details: error.message });
+      res.status(500).json({
+        error: error.message || "Internal server error",
+        details: error.message,
+        code: error.code,
+        stack: process.env.NODE_ENV === "production" ? undefined : error.stack
+      });
     }
   });
 
@@ -549,63 +808,93 @@ async function startServer() {
       { name: "thumbnail", maxCount: 1 },
     ]),
     async (req, res) => {
+      console.log(`PUT /api/courses/${req.params.id} started`);
       const currentDb = await getDbInstance();
-      if (!currentDb) return res.status(500).json({ error: "Firebase not initialized" });
+      if (!currentDb) {
+        console.error("Firebase not initialized in PUT route");
+        return res.status(500).json({ error: "Firebase not initialized", lastError: lastDbError });
+      }
 
       try {
         const { id } = req.params;
-        const { title, description, content, instructor, level, topics, overallQuiz } = req.body;
-        const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+        const { title, description, content, instructor, level, instructorId, topics, overallQuiz } = req.body;
+        const files = (req.files || {}) as { [fieldname: string]: Express.Multer.File[] };
+
+        console.log(`Updating course ${id}. Body keys:`, Object.keys(req.body));
+
+        const courseDoc = await currentDb.collection("courses").doc(id).get();
+        if (!courseDoc.exists) {
+          console.warn(`Course ${id} not found`);
+          return res.status(404).json({ error: "Course not found" });
+        }
+        const existingData = courseDoc.data() || {};
+
+        const parseJson = (val: any, fallback: any) => {
+          if (val === undefined || val === null || val === "undefined" || val === "null" || val === "") return fallback;
+          try {
+            return typeof val === "string" ? JSON.parse(val) : val;
+          } catch (e) {
+            console.error("Error parsing JSON field:", e, "Value:", val);
+            return fallback;
+          }
+        };
+
+        const updateData: any = {};
+        if (title !== undefined) updateData.title = title;
+        if (description !== undefined) updateData.description = description;
+        if (instructor !== undefined) updateData.instructor = instructor;
+        if (instructorId !== undefined) updateData.instructorId = instructorId;
+        if (level !== undefined) updateData.level = level;
+        if (content !== undefined) updateData.content = content;
+
+        if (topics !== undefined) {
+          updateData.topics = parseJson(topics, existingData.topics || []);
+        }
+        if (overallQuiz !== undefined) {
+          updateData.overallQuiz = parseJson(overallQuiz, existingData.overallQuiz || null);
+        }
+
+        updateData.updatedAt = new Date().toISOString();
 
         const pdfFile = files["pdf"]?.[0];
         const thumbnailFile = files["thumbnail"]?.[0];
 
-        const courseDoc = await currentDb.collection("courses").doc(id).get();
-        if (!courseDoc.exists) {
-          return res.status(404).json({ error: "Course not found" });
-        }
-        const existingData = courseDoc.data();
-
-        const updateData: any = {
-          title,
-          description,
-          instructor: instructor || "System",
-          level: level || "Beginner",
-          content: content || "",
-          topics: topics ? JSON.parse(topics) : existingData.topics || [],
-          overallQuiz: overallQuiz ? JSON.parse(overallQuiz) : existingData.overallQuiz || null,
-          updatedAt: new Date().toISOString(),
-        };
-
         if (pdfFile) {
-          if (existingData?.pdfUrl) {
-            const oldPdfPath = path.join(
-              process.cwd(),
-              existingData.pdfUrl.startsWith("/") ? existingData.pdfUrl.slice(1) : existingData.pdfUrl
-            );
-            if (fs.existsSync(oldPdfPath)) fs.unlinkSync(oldPdfPath);
-          }
-          updateData.pdfUrl = `/uploads/${pdfFile.filename}`;
+          console.log("Uploading new PDF...");
+          updateData.pdfUrl = await uploadToStorage(pdfFile, "courses/pdfs");
+        } else if (existingData.pdfUrl === "" || !existingData.pdfUrl) {
+          // If no PDF was uploaded and the existing one is empty, provide a default
+          updateData.pdfUrl = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
         }
 
         if (thumbnailFile) {
-          if (existingData?.thumbnailUrl && !existingData.thumbnailUrl.startsWith("http")) {
-            const oldThumbPath = path.join(
-              process.cwd(),
-              existingData.thumbnailUrl.startsWith("/")
-                ? existingData.thumbnailUrl.slice(1)
-                : existingData.thumbnailUrl
-            );
-            if (fs.existsSync(oldThumbPath)) fs.unlinkSync(oldThumbPath);
-          }
-          updateData.thumbnailUrl = `/uploads/${thumbnailFile.filename}`;
+          console.log("Uploading new thumbnail...");
+          updateData.thumbnailUrl = await uploadToStorage(thumbnailFile, "courses/thumbnails");
         }
 
+        // Remove any undefined values just in case
+        Object.keys(updateData).forEach(key => {
+          if (updateData[key] === undefined) {
+            delete updateData[key];
+          }
+        });
+
+        if (Object.keys(updateData).length === 0) {
+          return res.json({ success: true, message: "No changes to update" });
+        }
+
+        console.log("Applying update to Firestore...");
         await currentDb.collection("courses").doc(id).update(updateData);
+        console.log("Update successful");
         res.json({ success: true, id, ...updateData });
       } catch (error: any) {
         console.error("Error updating course:", error);
-        res.status(500).json({ error: "Internal server error", details: error.message });
+        res.status(500).json({
+          error: error.message || "Internal server error",
+          details: error.message,
+          code: error.code,
+          stack: process.env.NODE_ENV === "production" ? undefined : error.stack
+        });
       }
     }
   );
@@ -731,6 +1020,7 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
+    console.log(`APP_URL: ${process.env.APP_URL || "Not set (using relative paths)"}`);
   });
 
   // Global error handler

@@ -64,7 +64,7 @@ export const InstructorCourseForm = ({
 
     try {
       const url = courseId ? `/api/courses/${courseId}` : '/api/courses';
-      const method = courseId ? 'PATCH' : 'POST';
+      const method = courseId ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
         method,

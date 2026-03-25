@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Trash2, Eye, EyeOff, BookOpen, CheckCircle2, Edit2 } from 'lucide-react';
+import { Plus, Trash2, Eye, EyeOff, BookOpen, CheckCircle2, Edit2, Wrench, Loader2, FileText } from 'lucide-react';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { db } from '../../firebase';
 import AddCourseModal from '../modals/AddCourseModal';
@@ -11,6 +11,25 @@ export const CourseManagement = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingCourse, setEditingCourse] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isRepairing, setIsRepairing] = useState(false);
+  const [repairSuccess, setRepairSuccess] = useState(false);
+
+  const repairMedia = async () => {
+    setIsRepairing(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/admin/repair-media', { method: 'POST' });
+      if (!response.ok) throw new Error('Failed to repair media links');
+      const data = await response.json();
+      setRepairSuccess(true);
+      setTimeout(() => setRepairSuccess(false), 3000);
+      console.log(`Repaired ${data.updatedCount} courses`);
+    } catch (err: any) {
+      setError(`Repair failed: ${err.message}`);
+    } finally {
+      setIsRepairing(false);
+    }
+  };
 
   useEffect(() => {
     console.log('Initializing CourseManagement listener...');
@@ -80,13 +99,32 @@ export const CourseManagement = () => {
           <h3 className="text-2xl font-bold">Manage Courses</h3>
           <p className="text-sm text-gray-400">Add, edit, or remove courses from the platform.</p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 bg-neonBlue text-black px-6 py-3 rounded-xl font-bold transition-all hover:scale-105 shadow-[0_0_20px_rgba(0,212,255,0.2)]"
-        >
-          <Plus className="w-5 h-5" />
-          Add New Course
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={repairMedia}
+            disabled={isRepairing}
+            className={`flex items-center gap-2 px-4 py-3 rounded-xl font-bold transition-all border ${repairSuccess
+                ? 'bg-neonGreen/20 border-neonGreen text-neonGreen'
+                : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white'
+              }`}
+          >
+            {isRepairing ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : repairSuccess ? (
+              <CheckCircle2 className="w-5 h-5" />
+            ) : (
+              <Wrench className="w-5 h-5" />
+            )}
+            {isRepairing ? 'Repairing...' : repairSuccess ? 'Repaired!' : 'Repair Links'}
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 bg-neonBlue text-black px-6 py-3 rounded-xl font-bold transition-all hover:scale-105 shadow-[0_0_20px_rgba(0,212,255,0.2)]"
+          >
+            <Plus className="w-5 h-5" />
+            Add New Course
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -121,7 +159,15 @@ export const CourseManagement = () => {
                   <td className="p-6">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-xl bg-neonBlue/10 overflow-hidden border border-white/10">
-                        <img src={course.thumbnailUrl} className="w-full h-full object-cover" alt="" />
+                        <img
+                          src={course.thumbnailUrl || `https://picsum.photos/seed/${course.id}/800/600`}
+                          className="w-full h-full object-cover"
+                          alt=""
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${course.id}/800/600`;
+                          }}
+                        />
                       </div>
                       <div>
                         <div className="font-bold text-white text-lg">{course.title}</div>
@@ -147,6 +193,17 @@ export const CourseManagement = () => {
                   </td>
                   <td className="p-6">
                     <div className="flex items-center justify-end gap-2">
+                      {course.pdfUrl && (
+                        <a
+                          href={course.pdfUrl.startsWith('http') ? course.pdfUrl : window.location.origin + course.pdfUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-indigo-400"
+                          title="View PDF"
+                        >
+                          <FileText className="w-5 h-5" />
+                        </a>
+                      )}
                       <button
                         onClick={() => togglePublish(course.id, course.published)}
                         className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-neonBlue"

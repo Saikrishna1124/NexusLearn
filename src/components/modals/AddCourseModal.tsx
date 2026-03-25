@@ -125,7 +125,9 @@ export default function AddCourseModal({ onClose, onAdd, initialInstructorName, 
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || `Failed to ${editingCourse ? 'update' : 'create'} course`);
+        const serverError = errorData.error || errorData.details || `Failed to ${editingCourse ? 'update' : 'create'} course`;
+        const stack = errorData.stack ? `\n\nStack Trace:\n${errorData.stack}` : '';
+        throw new Error(`${serverError}${stack}`);
       }
 
       const data = await response.json();
@@ -139,7 +141,7 @@ export default function AddCourseModal({ onClose, onAdd, initialInstructorName, 
         content,
         enrollmentCount: editingCourse?.enrollmentCount || 0,
         published: editingCourse?.published || false,
-        thumbnailUrl: thumbnail ? URL.createObjectURL(thumbnail) : (editingCourse?.thumbnailUrl || `https://picsum.photos/seed/${title.replace(/\s+/g, '').toLowerCase()}/800/600`),
+        thumbnailUrl: data.thumbnailUrl || editingCourse?.thumbnailUrl || `https://picsum.photos/seed/${title.replace(/\s+/g, '').toLowerCase()}/800/600`,
       });
       onClose();
     } catch (err: any) {
