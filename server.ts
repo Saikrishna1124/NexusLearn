@@ -532,6 +532,102 @@ async function startServer() {
     }
   });
 
+  // Repair media links for all courses
+  app.post("/api/admin/repair-media", async (req, res) => {
+    const currentDb = await getDbInstance();
+    if (!currentDb) return res.status(500).json({ error: "DB not ready" });
+
+    try {
+      const snap = await currentDb.collection("courses").get();
+      const updates = [];
+      const appUrl = process.env.APP_URL || "";
+
+      for (const doc of snap.docs) {
+        const data = doc.data();
+        let needsUpdate = false;
+        const updateData: any = {};
+
+        // Fix thumbnailUrl
+        if (
+          !data.thumbnailUrl ||
+          data.thumbnailUrl.includes("storage.googleapis.com") ||
+          data.thumbnailUrl.startsWith("/api/files/")
+        ) {
+          if (
+            data.thumbnailUrl &&
+            (data.thumbnailUrl.includes("storage.googleapis.com") ||
+              data.thumbnailUrl.startsWith("/api/files/"))
+          ) {
+            let fileName = "";
+            if (data.thumbnailUrl.includes("storage.googleapis.com")) {
+              const parts = data.thumbnailUrl.split("/");
+              fileName = parts
+                .slice(parts.indexOf(storageBucket?.name || "") + 1)
+                .join("/");
+            } else {
+              fileName = data.thumbnailUrl.replace("/api/files/", "");
+            }
+            if (fileName && storageBucket) {
+              updateData.thumbnailUrl = `${appUrl}/api/files/${fileName}`;
+              needsUpdate = true;
+            } else {
+              updateData.thumbnailUrl = `https://picsum.photos/seed/${doc.id}/800/600`;
+              needsUpdate = true;
+            }
+          } else if (!data.thumbnailUrl) {
+            updateData.thumbnailUrl = `https://picsum.photos/seed/${doc.id}/800/600`;
+            needsUpdate = true;
+          }
+        }
+
+        // Fix pdfUrl (supporting both local fixes and Cloudinary fallbacks)
+        if (
+          !data.pdfUrl ||
+          data.pdfUrl.includes("storage.googleapis.com") ||
+          data.pdfUrl.startsWith("/api/files/") ||
+          data.pdfUrl.includes("w3.org")
+        ) {
+          if (
+            data.pdfUrl &&
+            (data.pdfUrl.includes("storage.googleapis.com") ||
+              data.pdfUrl.startsWith("/api/files/") ||
+              data.pdfUrl.includes("w3.org"))
+          ) {
+            let fileName = "";
+            if (data.pdfUrl.includes("storage.googleapis.com")) {
+              const parts = data.pdfUrl.split("/");
+              fileName = parts
+                .slice(parts.indexOf(storageBucket?.name || "") + 1)
+                .join("/");
+            } else {
+              fileName = data.pdfUrl.replace("/api/files/", "");
+            }
+            if (fileName && storageBucket) {
+              updateData.pdfUrl = `${appUrl}/api/files/${fileName}`;
+              needsUpdate = true;
+            } else {
+              updateData.pdfUrl = "https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf";
+              needsUpdate = true;
+            }
+          } else if (!data.pdfUrl) {
+            updateData.pdfUrl = "https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf";
+            needsUpdate = true;
+          }
+        }
+
+        if (needsUpdate) {
+          updates.push(doc.ref.update(updateData));
+        }
+      }
+
+      await Promise.all(updates);
+      res.json({ success: true, updatedCount: updates.length });
+    } catch (error: any) {
+      console.error("Error repairing media links:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/health", (req, res) => {
     res.json({
       status: "ok",
