@@ -142,6 +142,9 @@ export default function AddCourseModal({ onClose, onAdd, initialInstructorName, 
         enrollmentCount: editingCourse?.enrollmentCount || 0,
         published: editingCourse?.published || false,
         thumbnailUrl: data.thumbnailUrl || editingCourse?.thumbnailUrl || `https://picsum.photos/seed/${title.replace(/\s+/g, '').toLowerCase()}/800/600`,
+        pdfUrl: data.pdfUrl || editingCourse?.pdfUrl || "",
+        topics,
+        overallQuiz
       });
       onClose();
     } catch (err: any) {

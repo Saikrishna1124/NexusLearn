@@ -15,11 +15,13 @@ import { getStorage } from "firebase-admin/storage";
 dotenv.config();
 
 // Cloudinary configuration
-const cloudinaryCloudName = process.env.CLOUDINARY_CLOUD_NAME || process.env.cloud_name || "dxanwhbxp";
-const cloudinaryApiKey = process.env.CLOUDINARY_API_KEY || process.env.api_key || "545661618726322";
-const cloudinaryApiSecret = process.env.CLOUDINARY_API_SECRET || process.env.api_secret || "x_AlSEr3vOyOgI8ADDQWHVtVkQk";
+const cloudinaryCloudName =
+  process.env.CLOUDINARY_CLOUD_NAME || process.env.cloud_name || "";
+const cloudinaryApiKey =
+  process.env.CLOUDINARY_API_KEY || process.env.api_key || "";
+const cloudinaryApiSecret =
+  process.env.CLOUDINARY_API_SECRET || process.env.api_secret || "";
 
-// Clean up values (remove trailing commas or whitespace if any)
 const cleanValue = (val: string) => val.replace(/[,]$/, "").trim();
 
 cloudinary.config({
@@ -29,7 +31,9 @@ cloudinary.config({
 });
 
 if (!process.env.CLOUDINARY_CLOUD_NAME && !process.env.cloud_name) {
-  console.warn("Cloudinary credentials NOT found in environment variables. Using fallback hardcoded values.");
+  console.warn(
+    "Cloudinary credentials NOT found in environment variables."
+  );
 }
 
 // Load Firebase config
@@ -50,7 +54,9 @@ if (firebaseConfig.projectId) {
   process.env.GOOGLE_CLOUD_PROJECT = firebaseConfig.projectId;
   process.env.GCLOUD_PROJECT = firebaseConfig.projectId;
   process.env.FIRESTORE_PROJECT_ID = firebaseConfig.projectId;
-  console.log(`Forcing project ID environment variables to: ${firebaseConfig.projectId}`);
+  console.log(
+    `Forcing project ID environment variables to: ${firebaseConfig.projectId}`
+  );
 }
 
 const __filename = fileURLToPath(import.meta.url);
@@ -62,7 +68,7 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir);
 }
 
-// Multer config for memory storage (for Firebase Storage)
+// Multer memory storage
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
@@ -80,11 +86,9 @@ const getServiceAccountFromEnv = () => {
 
   try {
     const parsed = JSON.parse(raw);
-
     if (parsed.private_key) {
       parsed.private_key = parsed.private_key.replace(/\\n/g, "\n");
     }
-
     return parsed;
   } catch (error: any) {
     console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT:", error.message);
@@ -105,22 +109,30 @@ const getFirebaseApp = async () => {
     const serviceAccountFromEnv = getServiceAccountFromEnv();
 
     if (serviceAccountFromEnv) {
-      console.log("Initializing Firebase Admin using FIREBASE_SERVICE_ACCOUNT env var...");
+      console.log(
+        "Initializing Firebase Admin using FIREBASE_SERVICE_ACCOUNT env var..."
+      );
       firebaseApp = admin.initializeApp({
-        credential: admin.credential.cert(serviceAccountFromEnv as admin.ServiceAccount),
+        credential: admin.credential.cert(
+          serviceAccountFromEnv as admin.ServiceAccount
+        ),
         projectId: firebaseConfig.projectId || serviceAccountFromEnv.project_id,
       });
     } else if (
       process.env.GOOGLE_APPLICATION_CREDENTIALS &&
       fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)
     ) {
-      console.log("Initializing Firebase Admin using local serviceAccountKey.json file...");
+      console.log(
+        "Initializing Firebase Admin using local serviceAccountKey.json file..."
+      );
       const serviceAccount = JSON.parse(
         fs.readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, "utf-8")
       );
 
       firebaseApp = admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
+        credential: admin.credential.cert(
+          serviceAccount as admin.ServiceAccount
+        ),
         projectId: firebaseConfig.projectId || serviceAccount.project_id,
       });
     } else {
@@ -130,7 +142,9 @@ const getFirebaseApp = async () => {
       });
     }
 
-    console.log(`Firebase Admin initialized with project: ${firebaseApp.options.projectId}`);
+    console.log(
+      `Firebase Admin initialized with project: ${firebaseApp.options.projectId}`
+    );
     console.log(
       "App Options:",
       JSON.stringify({ ...firebaseApp.options, credential: "REDACTED" })
@@ -175,30 +189,37 @@ const initializeDb = async () => {
     return null;
   }
 
-  console.log(`Initializing Firestore. Target Project: ${projectId}, Target Database: ${dbId}`);
+  console.log(
+    `Initializing Firestore. Target Project: ${projectId}, Target Database: ${dbId}`
+  );
 
   firebaseApp = await getFirebaseApp();
   if (!firebaseApp) {
-    lastDbError = "getFirebaseApp() returned null. Check service account credentials and project ID.";
+    lastDbError =
+      "getFirebaseApp() returned null. Check service account credentials and project ID.";
     return null;
   }
 
   auth = getAuth(firebaseApp);
 
-  const bucketName = firebaseConfig.storageBucket || `${firebaseConfig.projectId}.appspot.com`;
+  const bucketName =
+    firebaseConfig.storageBucket || `${firebaseConfig.projectId}.appspot.com`;
   console.log(`Initializing Storage Bucket: ${bucketName}`);
   storageBucket = getStorage(firebaseApp).bucket(bucketName);
 
-  // Verify bucket access
   try {
     const [exists] = await storageBucket.exists();
     if (!exists) {
-      console.warn(`Storage bucket ${bucketName} does not exist. Uploads will use placeholders.`);
+      console.warn(
+        `Storage bucket ${bucketName} does not exist. Uploads will use Cloudinary/fallbacks.`
+      );
     } else {
       console.log(`Storage bucket ${bucketName} verified and accessible.`);
     }
   } catch (e: any) {
-    console.warn(`Could not verify storage bucket ${bucketName}: ${e.message}. This is normal if Storage is not yet enabled.`);
+    console.warn(
+      `Could not verify storage bucket ${bucketName}: ${e.message}. This is normal if Storage is not yet enabled.`
+    );
   }
 
   if (dbId && dbId !== "(default)") {
@@ -223,36 +244,53 @@ const initializeDb = async () => {
     console.error("Error initializing default database:", e.message);
   }
 
-  lastDbError = `All Firestore initialization attempts failed. Last error: ${lastDbError || 'Unknown'}`;
+  lastDbError = `All Firestore initialization attempts failed. Last error: ${lastDbError || "Unknown"
+    }`;
   console.warn(lastDbError);
   return null;
 };
 
-async function uploadToStorage(file: Express.Multer.File, folder: string): Promise<string> {
+async function uploadToStorage(
+  file: Express.Multer.File,
+  folder: string
+): Promise<string> {
   try {
-    return new Promise((resolve) => {
-      const isPdf = file.mimetype === "application/pdf" || (file.originalname && file.originalname.toLowerCase().endsWith(".pdf"));
+    return await new Promise((resolve) => {
+      const isPdf =
+        file.mimetype === "application/pdf" ||
+        (file.originalname &&
+          file.originalname.toLowerCase().endsWith(".pdf"));
+
       const uploadStream = cloudinary.uploader.upload_stream(
         {
-          folder: folder,
-          resource_type: isPdf ? "image" : "auto", // Using 'image' for PDFs is BETTER for inline previews in Cloudinary
+          folder,
+          resource_type: isPdf ? "raw" : "image",
         },
         (error, result) => {
           if (error) {
             console.error("Cloudinary upload error:", error);
-            // Fallback to high-quality sample PDF
-            resolve(isPdf ? "https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf" : `https://picsum.photos/seed/${folder}-${Date.now()}/800/600`);
+            resolve(
+              isPdf
+                ? ""
+                : `https://picsum.photos/seed/${folder}-${Date.now()}/800/600`
+            );
           } else {
-            resolve(result!.secure_url);
+            resolve(result?.secure_url || "");
           }
         }
       );
+
       uploadStream.end(file.buffer);
     });
   } catch (err: any) {
     console.error("Error in uploadToStorage:", err);
-    const isPdf = file.mimetype === "application/pdf" || (file.originalname && file.originalname.toLowerCase().endsWith(".pdf"));
-    return isPdf ? "https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf" : `https://picsum.photos/seed/${folder}-${Date.now()}/800/600`;
+    const isPdf =
+      file.mimetype === "application/pdf" ||
+      (file.originalname &&
+        file.originalname.toLowerCase().endsWith(".pdf"));
+    return isPdf
+      ? ""
+      : `https://picsum.photos/seed/${folder}-${Date.now()}/800/600`;
   }
 }
 
@@ -290,7 +328,8 @@ async function seedAdmin() {
         email: adminEmail,
         displayName: "System Admin",
         role: "admin",
-        photoURL: `https://ui-avatars.com/api/?name=Admin&background=4f46e5&color=fff`,
+        photoURL:
+          "https://ui-avatars.com/api/?name=Admin&background=4f46e5&color=fff",
         createdAt: new Date().toISOString(),
       });
       console.log("Admin profile seeded in Firestore");
@@ -319,7 +358,7 @@ async function seedCourses() {
       price: 0,
       rating: 5,
       thumbnailUrl: "https://picsum.photos/seed/js-nexus/800/500",
-      pdfUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+      pdfUrl: "",
       published: true,
       createdAt: new Date().toISOString(),
       enrollmentCount: 0,
@@ -335,7 +374,7 @@ async function seedCourses() {
       price: 0,
       rating: 5,
       thumbnailUrl: "https://picsum.photos/seed/python-nexus/800/500",
-      pdfUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+      pdfUrl: "",
       published: true,
       createdAt: new Date().toISOString(),
       enrollmentCount: 0,
@@ -351,7 +390,7 @@ async function seedCourses() {
       price: 0,
       rating: 4.8,
       thumbnailUrl: "https://picsum.photos/seed/fullstack-nexus/800/500",
-      pdfUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+      pdfUrl: "",
       published: true,
       createdAt: new Date().toISOString(),
       enrollmentCount: 0,
@@ -367,7 +406,7 @@ async function seedCourses() {
       price: 0,
       rating: 4.9,
       thumbnailUrl: "https://picsum.photos/seed/java-nexus/800/500",
-      pdfUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+      pdfUrl: "",
       published: true,
       createdAt: new Date().toISOString(),
       enrollmentCount: 0,
@@ -378,12 +417,17 @@ async function seedCourses() {
     console.log("Checking courses collection...");
     for (const course of defaultCourses) {
       console.log(`Checking if course exists: ${course.title}`);
-      const q = await db.collection("courses").where("title", "==", course.title).get();
+      const q = await db
+        .collection("courses")
+        .where("title", "==", course.title)
+        .get();
       if (q.empty) {
         console.log(`Seeding course: ${course.title}`);
         await db.collection("courses").add(course);
       } else {
-        console.log(`Course already exists: ${course.title}, updating all fields...`);
+        console.log(
+          `Course already exists: ${course.title}, updating all fields...`
+        );
         const docId = q.docs[0].id;
         await db.collection("courses").doc(docId).update({
           ...course,
@@ -397,7 +441,6 @@ async function seedCourses() {
   }
 }
 
-// Helper to extract public_id from Cloudinary URL
 function getCloudinaryPublicId(url: string): string | null {
   if (!url || !url.includes("cloudinary.com")) return null;
   try {
@@ -405,15 +448,16 @@ function getCloudinaryPublicId(url: string): string | null {
     const uploadIndex = parts.indexOf("upload");
     if (uploadIndex === -1) return null;
 
-    // The public_id starts after the version (e.g., v123456789) or directly after upload
     let publicIdWithExt = "";
-    if (parts[uploadIndex + 1].startsWith("v") && !isNaN(Number(parts[uploadIndex + 1].substring(1)))) {
+    if (
+      parts[uploadIndex + 1].startsWith("v") &&
+      !isNaN(Number(parts[uploadIndex + 1].substring(1)))
+    ) {
       publicIdWithExt = parts.slice(uploadIndex + 2).join("/");
     } else {
       publicIdWithExt = parts.slice(uploadIndex + 1).join("/");
     }
 
-    // Remove file extension
     return publicIdWithExt.split(".")[0];
   } catch (e) {
     console.error("Error extracting Cloudinary public_id:", e);
@@ -454,21 +498,17 @@ async function startServer() {
     }
   })();
 
-  // Proxy route for Firebase Storage files
   app.get("/api/files/*", async (req, res) => {
     try {
       if (!storageBucket) {
-        console.error("Storage bucket not initialized for proxy request");
         return res.status(500).send("Storage bucket not initialized");
       }
 
       const filePath = req.params[0];
-      console.log(`Proxying file request: ${filePath}`);
       const file = storageBucket.file(filePath);
       const [exists] = await file.exists();
 
       if (!exists) {
-        console.warn(`File not found in storage: ${filePath}`);
         return res.status(404).send("File not found");
       }
 
@@ -478,7 +518,10 @@ async function startServer() {
         res.setHeader("Content-Type", "application/pdf");
         res.setHeader("Content-Disposition", "inline");
       } else {
-        res.setHeader("Content-Type", metadata.contentType || "application/octet-stream");
+        res.setHeader(
+          "Content-Type",
+          metadata.contentType || "application/octet-stream"
+        );
       }
       res.setHeader("Cache-Control", "public, max-age=3600");
 
@@ -486,83 +529,6 @@ async function startServer() {
     } catch (error: any) {
       console.error(`Error serving file ${req.params[0]}:`, error);
       res.status(500).send(`Error serving file: ${error.message}`);
-    }
-  });
-
-  // Repair media links for all courses
-  app.post("/api/admin/repair-media", async (req, res) => {
-    const currentDb = await getDbInstance();
-    if (!currentDb) return res.status(500).json({ error: "DB not ready" });
-
-    try {
-      console.log("Starting media repair process...");
-      const snap = await currentDb.collection("courses").get();
-      const updates = [];
-      const appUrl = process.env.APP_URL || '';
-
-      for (const doc of snap.docs) {
-        const data = doc.data();
-        let needsUpdate = false;
-        const updateData: any = {};
-
-        // Fix thumbnailUrl
-        if (!data.thumbnailUrl || data.thumbnailUrl.includes("storage.googleapis.com") || data.thumbnailUrl.startsWith("/api/files/")) {
-          if (data.thumbnailUrl && (data.thumbnailUrl.includes("storage.googleapis.com") || data.thumbnailUrl.startsWith("/api/files/"))) {
-            let fileName = "";
-            if (data.thumbnailUrl.includes("storage.googleapis.com")) {
-              const parts = data.thumbnailUrl.split("/");
-              fileName = parts.slice(parts.indexOf(storageBucket?.name || "") + 1).join("/");
-            } else {
-              fileName = data.thumbnailUrl.replace("/api/files/", "");
-            }
-            if (fileName && storageBucket) {
-              updateData.thumbnailUrl = `${appUrl}/api/files/${fileName}`;
-              needsUpdate = true;
-            } else {
-              updateData.thumbnailUrl = `https://picsum.photos/seed/${doc.id}/800/600`;
-              needsUpdate = true;
-            }
-          } else if (!data.thumbnailUrl) {
-            updateData.thumbnailUrl = `https://picsum.photos/seed/${doc.id}/800/600`;
-            needsUpdate = true;
-          }
-        }
-
-        // Fix pdfUrl
-        if (!data.pdfUrl || data.pdfUrl.includes("storage.googleapis.com") || data.pdfUrl.startsWith("/api/files/")) {
-          if (data.pdfUrl && (data.pdfUrl.includes("storage.googleapis.com") || data.pdfUrl.startsWith("/api/files/"))) {
-            let fileName = "";
-            if (data.pdfUrl.includes("storage.googleapis.com")) {
-              const parts = data.pdfUrl.split("/");
-              fileName = parts.slice(parts.indexOf(storageBucket?.name || "") + 1).join("/");
-            } else {
-              fileName = data.pdfUrl.replace("/api/files/", "");
-            }
-            if (fileName && storageBucket) {
-              updateData.pdfUrl = `${appUrl}/api/files/${fileName}`;
-              needsUpdate = true;
-            } else {
-              updateData.pdfUrl = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
-              needsUpdate = true;
-            }
-          } else if (!data.pdfUrl) {
-            updateData.pdfUrl = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
-            needsUpdate = true;
-          }
-        }
-
-        if (needsUpdate) {
-          console.log(`Repairing course ${doc.id}:`, updateData);
-          updates.push(doc.ref.update(updateData));
-        }
-      }
-
-      await Promise.all(updates);
-      console.log(`Successfully repaired ${updates.length} courses`);
-      res.json({ success: true, updatedCount: updates.length });
-    } catch (error: any) {
-      console.error("Error repairing media links:", error);
-      res.status(500).json({ error: error.message });
     }
   });
 
@@ -651,31 +617,47 @@ async function startServer() {
     ]),
     async (req, res) => {
       const currentDb = await getDbInstance();
-      if (!currentDb) return res.status(500).json({ error: "Firebase not initialized" });
+      if (!currentDb) {
+        return res.status(500).json({ error: "Firebase not initialized" });
+      }
 
       try {
-        const { title, description, content, instructor, level, instructorId, topics, overallQuiz } = req.body;
-        const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+        const {
+          title,
+          description,
+          content,
+          instructor,
+          level,
+          instructorId,
+          topics,
+          overallQuiz,
+        } = req.body;
 
+        const files = req.files as { [fieldname: string]: Express.Multer.File[] };
         const pdfFile = files["pdf"]?.[0];
         const thumbnailFile = files["thumbnail"]?.[0];
 
-        let pdfUrl = "https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf";
-        let thumbnailUrl = `https://picsum.photos/seed/${title.replace(/\s+/g, "").toLowerCase()}/800/600`;
+        let pdfUrl = "";
+        let thumbnailUrl = `https://picsum.photos/seed/${title
+          .replace(/\s+/g, "")
+          .toLowerCase()}/800/600`;
 
         if (pdfFile) {
           pdfUrl = await uploadToStorage(pdfFile, "courses/pdfs");
         }
+
         if (thumbnailFile) {
-          thumbnailUrl = await uploadToStorage(thumbnailFile, "courses/thumbnails");
+          thumbnailUrl = await uploadToStorage(
+            thumbnailFile,
+            "courses/thumbnails"
+          );
         }
 
         const parseJson = (val: any, fallback: any) => {
           if (!val || val === "undefined" || val === "null") return fallback;
           try {
             return typeof val === "string" ? JSON.parse(val) : val;
-          } catch (e) {
-            console.error("Error parsing JSON field:", e);
+          } catch {
             return fallback;
           }
         };
@@ -704,7 +686,8 @@ async function startServer() {
           error: error.message || "Internal server error",
           details: error.message,
           code: error.code,
-          stack: process.env.NODE_ENV === "production" ? undefined : error.stack
+          stack:
+            process.env.NODE_ENV === "production" ? undefined : error.stack,
         });
       }
     }
@@ -724,47 +707,27 @@ async function startServer() {
 
       const data = doc.data();
 
-      // Delete from Cloudinary if applicable
       if (data?.pdfUrl && data.pdfUrl.includes("cloudinary.com")) {
         const publicId = getCloudinaryPublicId(data.pdfUrl);
         if (publicId) {
           try {
-            await cloudinary.uploader.destroy(publicId, { resource_type: "raw" });
-            console.log(`Deleted PDF from Cloudinary: ${publicId}`);
+            await cloudinary.uploader.destroy(publicId, {
+              resource_type: "raw",
+            });
           } catch (e) {
             console.warn("Failed to delete PDF from Cloudinary:", e);
           }
         }
       }
+
       if (data?.thumbnailUrl && data.thumbnailUrl.includes("cloudinary.com")) {
         const publicId = getCloudinaryPublicId(data.thumbnailUrl);
         if (publicId) {
           try {
             await cloudinary.uploader.destroy(publicId);
-            console.log(`Deleted thumbnail from Cloudinary: ${publicId}`);
           } catch (e) {
             console.warn("Failed to delete thumbnail from Cloudinary:", e);
           }
-        }
-      }
-
-      // Delete from Firebase Storage if applicable
-      if (data?.pdfUrl && data.pdfUrl.includes("storage.googleapis.com")) {
-        try {
-          const fileUrl = new URL(data.pdfUrl);
-          const filePath = fileUrl.pathname.split("/").slice(2).join("/");
-          await storageBucket.file(filePath).delete();
-        } catch (e) {
-          console.warn("Failed to delete PDF from storage:", e);
-        }
-      }
-      if (data?.thumbnailUrl && data.thumbnailUrl.includes("storage.googleapis.com")) {
-        try {
-          const fileUrl = new URL(data.thumbnailUrl);
-          const filePath = fileUrl.pathname.split("/").slice(2).join("/");
-          await storageBucket.file(filePath).delete();
-        } catch (e) {
-          console.warn("Failed to delete thumbnail from storage:", e);
         }
       }
 
@@ -776,7 +739,8 @@ async function startServer() {
         error: error.message || "Internal server error",
         details: error.message,
         code: error.code,
-        stack: process.env.NODE_ENV === "production" ? undefined : error.stack
+        stack:
+          process.env.NODE_ENV === "production" ? undefined : error.stack,
       });
     }
   });
@@ -796,7 +760,8 @@ async function startServer() {
         error: error.message || "Internal server error",
         details: error.message,
         code: error.code,
-        stack: process.env.NODE_ENV === "production" ? undefined : error.stack
+        stack:
+          process.env.NODE_ENV === "production" ? undefined : error.stack,
       });
     }
   });
@@ -808,33 +773,51 @@ async function startServer() {
       { name: "thumbnail", maxCount: 1 },
     ]),
     async (req, res) => {
-      console.log(`PUT /api/courses/${req.params.id} started`);
       const currentDb = await getDbInstance();
       if (!currentDb) {
-        console.error("Firebase not initialized in PUT route");
-        return res.status(500).json({ error: "Firebase not initialized", lastError: lastDbError });
+        return res.status(500).json({
+          error: "Firebase not initialized",
+          lastError: lastDbError,
+        });
       }
 
       try {
         const { id } = req.params;
-        const { title, description, content, instructor, level, instructorId, topics, overallQuiz } = req.body;
-        const files = (req.files || {}) as { [fieldname: string]: Express.Multer.File[] };
+        const {
+          title,
+          description,
+          content,
+          instructor,
+          level,
+          instructorId,
+          topics,
+          overallQuiz,
+        } = req.body;
 
-        console.log(`Updating course ${id}. Body keys:`, Object.keys(req.body));
+        const files = (req.files || {}) as {
+          [fieldname: string]: Express.Multer.File[];
+        };
 
         const courseDoc = await currentDb.collection("courses").doc(id).get();
         if (!courseDoc.exists) {
-          console.warn(`Course ${id} not found`);
           return res.status(404).json({ error: "Course not found" });
         }
+
         const existingData = courseDoc.data() || {};
 
         const parseJson = (val: any, fallback: any) => {
-          if (val === undefined || val === null || val === "undefined" || val === "null" || val === "") return fallback;
+          if (
+            val === undefined ||
+            val === null ||
+            val === "undefined" ||
+            val === "null" ||
+            val === ""
+          ) {
+            return fallback;
+          }
           try {
             return typeof val === "string" ? JSON.parse(val) : val;
-          } catch (e) {
-            console.error("Error parsing JSON field:", e, "Value:", val);
+          } catch {
             return fallback;
           }
         };
@@ -846,12 +829,14 @@ async function startServer() {
         if (instructorId !== undefined) updateData.instructorId = instructorId;
         if (level !== undefined) updateData.level = level;
         if (content !== undefined) updateData.content = content;
-
         if (topics !== undefined) {
           updateData.topics = parseJson(topics, existingData.topics || []);
         }
         if (overallQuiz !== undefined) {
-          updateData.overallQuiz = parseJson(overallQuiz, existingData.overallQuiz || null);
+          updateData.overallQuiz = parseJson(
+            overallQuiz,
+            existingData.overallQuiz || null
+          );
         }
 
         updateData.updatedAt = new Date().toISOString();
@@ -860,20 +845,17 @@ async function startServer() {
         const thumbnailFile = files["thumbnail"]?.[0];
 
         if (pdfFile) {
-          console.log("Uploading new PDF...");
           updateData.pdfUrl = await uploadToStorage(pdfFile, "courses/pdfs");
-        } else if (existingData.pdfUrl === "" || !existingData.pdfUrl) {
-          // If no PDF was uploaded and the existing one is empty, provide a default
-          updateData.pdfUrl = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
         }
 
         if (thumbnailFile) {
-          console.log("Uploading new thumbnail...");
-          updateData.thumbnailUrl = await uploadToStorage(thumbnailFile, "courses/thumbnails");
+          updateData.thumbnailUrl = await uploadToStorage(
+            thumbnailFile,
+            "courses/thumbnails"
+          );
         }
 
-        // Remove any undefined values just in case
-        Object.keys(updateData).forEach(key => {
+        Object.keys(updateData).forEach((key) => {
           if (updateData[key] === undefined) {
             delete updateData[key];
           }
@@ -883,9 +865,7 @@ async function startServer() {
           return res.json({ success: true, message: "No changes to update" });
         }
 
-        console.log("Applying update to Firestore...");
         await currentDb.collection("courses").doc(id).update(updateData);
-        console.log("Update successful");
         res.json({ success: true, id, ...updateData });
       } catch (error: any) {
         console.error("Error updating course:", error);
@@ -893,7 +873,8 @@ async function startServer() {
           error: error.message || "Internal server error",
           details: error.message,
           code: error.code,
-          stack: process.env.NODE_ENV === "production" ? undefined : error.stack
+          stack:
+            process.env.NODE_ENV === "production" ? undefined : error.stack,
         });
       }
     }
@@ -902,7 +883,10 @@ async function startServer() {
   app.get("/api/debug/courses", async (req, res) => {
     const currentDb = await getDbInstance();
     if (!currentDb) {
-      return res.status(500).json({ error: "Firebase not initialized", lastError: lastDbError });
+      return res.status(500).json({
+        error: "Firebase not initialized",
+        lastError: lastDbError,
+      });
     }
 
     try {
@@ -911,19 +895,6 @@ async function startServer() {
       res.json({ count: snap.size, courses, lastError: lastDbError });
     } catch (error: any) {
       res.status(500).json({ error: error.message, lastError: lastDbError });
-    }
-  });
-
-  app.get("/api/debug/users", async (req, res) => {
-    try {
-      const currentDb = await getDbInstance();
-      if (!currentDb) return res.status(500).json({ error: "DB not ready" });
-
-      const snap = await currentDb.collection("users").get();
-      const users = snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
-      res.json({ count: snap.size, users });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
     }
   });
 
@@ -951,11 +922,15 @@ async function startServer() {
     try {
       const currentDb = await getDbInstance();
       if (!currentDb) {
-        console.error("Stats API: Firebase not initialized");
-        return res.status(500).json({ error: "Firebase not initialized", lastError: lastDbError });
+        return res
+          .status(500)
+          .json({ error: "Firebase not initialized", lastError: lastDbError });
       }
 
-      const studentsSnap = await currentDb.collection("users").where("role", "==", "student").get();
+      const studentsSnap = await currentDb
+        .collection("users")
+        .where("role", "==", "student")
+        .get();
       const coursesSnap = await currentDb.collection("courses").get();
       const enrollmentsSnap = await currentDb.collection("enrollments").get();
 
@@ -965,41 +940,15 @@ async function startServer() {
         totalEnrollments: enrollmentsSnap?.size || 0,
       };
 
-      console.log(
-        `Stats API: Found ${stats.totalStudents} students, ${stats.totalCourses} courses, ${stats.totalEnrollments} enrollments`
-      );
-
       res.json(stats);
     } catch (error: any) {
       console.error("Error fetching stats:", error);
-      res.status(500).json({ error: "Internal server error", details: error.message });
+      res
+        .status(500)
+        .json({ error: "Internal server error", details: error.message });
     }
   });
 
-  app.get("/api/admin/students", async (req, res) => {
-    try {
-      const currentDb = await getDbInstance();
-      if (!currentDb) return res.status(500).json({ error: "DB not ready" });
-
-      const studentsSnap = await currentDb.collection("users")
-        .where("role", "==", "student")
-        .get();
-
-      console.log(`Students API: Found ${studentsSnap.size} students`);
-
-      const students = studentsSnap.docs.map((doc: any) => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-
-      res.json(students);
-    } catch (error: any) {
-      console.error("Error fetching students:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // 404 handler for API routes
   app.use("/api/*", (req, res) => {
     res.status(404).json({ error: `API route not found: ${req.originalUrl}` });
   });
@@ -1020,18 +969,26 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
-    console.log(`APP_URL: ${process.env.APP_URL || "Not set (using relative paths)"}`);
+    console.log(
+      `APP_URL: ${process.env.APP_URL || "Not set (using relative paths)"}`
+    );
   });
 
-  // Global error handler
-  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    console.error("Global Error Handler:", err);
-    res.status(500).json({
-      error: "Unhandled server error",
-      message: err.message,
-      stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
-    });
-  });
+  app.use(
+    (
+      err: any,
+      req: express.Request,
+      res: express.Response,
+      next: express.NextFunction
+    ) => {
+      console.error("Global Error Handler:", err);
+      res.status(500).json({
+        error: "Unhandled server error",
+        message: err.message,
+        stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+      });
+    }
+  );
 }
 
 startServer().catch((err) => {

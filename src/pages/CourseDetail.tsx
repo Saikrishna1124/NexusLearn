@@ -367,34 +367,17 @@ export const CourseDetail = () => {
               </div>
             </div>
           ) : (
-            <div className="bg-white/5 border border-white/10 rounded-[2rem] overflow-hidden aspect-[3/4] relative group">
+            <div className="bg-white/5 border border-white/10 rounded-[2.5rem] overflow-hidden min-h-[80vh] h-[800px] relative group shadow-2xl shadow-black/50">
               {course.pdfUrl ? (
-                <div className="flex flex-col items-center justify-center h-full p-12 text-center bg-white/5 backdrop-blur-sm border border-white/10 rounded-[2rem]">
-                  <div className="w-24 h-24 bg-indigo-600/20 rounded-3xl flex items-center justify-center mb-8">
-                    <FileText className="w-12 h-12 text-indigo-400" />
-                  </div>
-                  <h3 className="text-3xl font-bold text-white mb-4">Course Materials</h3>
-                  <p className="text-gray-400 mb-10 max-w-sm mx-auto leading-relaxed">
-                    Download the complete course PDF to access offline reading, assignments, and detailed explanations.
-                  </p>
-                  <a
-                    href={course.pdfUrl}
-                    download
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-5 rounded-2xl font-bold text-lg transition-all shadow-xl shadow-indigo-600/20 hover:scale-105 flex items-center gap-3"
-                  >
-                    <FileText className="w-6 h-6" />
-                    Download PDF Document
-                  </a>
-                  <div className="mt-8 text-xs text-gray-500 font-mono uppercase tracking-widest">
-                    Available in high quality PDF format
-                  </div>
-                </div>
+                <iframe
+                  src={`https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(course.pdfUrl)}`}
+                  title="Course PDF Preview"
+                  className="w-full h-full border-none rounded-[2rem]"
+                />
               ) : (
-                <div className="flex flex-col items-center justify-center h-full p-12 text-center">
-                  <FileText className="w-16 h-16 text-gray-600 mb-4 opacity-20" />
-                  <p className="text-gray-500 italic">No PDF materials currently available for this section.</p>
+                <div className="flex flex-col items-center justify-center h-full p-20 text-gray-400">
+                  <BookOpen className="w-16 h-16 mb-4 opacity-20" />
+                  <p className="text-xl font-medium">No preview available</p>
                 </div>
               )}
             </div>
