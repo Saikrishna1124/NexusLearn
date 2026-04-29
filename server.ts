@@ -661,40 +661,71 @@ async function startServer() {
 
   // Auth Routes
   app.post("/api/auth/login", async (req, res) => {
-    const { email, uid, displayName, role } = req.body;
-    
+    const { uid, email, displayName } = req.body;
+
     if (!uid || !email) {
-      return res.status(400).json({ error: "Missing user information" });
+      return res.status(400).json({ error: "Missing user data" });
     }
 
-    const token = jwt.sign(
-      { uid, email, role: role || 'student', displayName },
-      JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const currentDb = await getDbInstance();
+    if (!currentDb) return res.status(500).json({ error: "DB not ready" });
 
-    res.json({ token, success: true });
+    try {
+      const userRef = currentDb.collection("users").doc(uid);
+      const userDoc = await userRef.get();
+
+      let userData;
+
+      if (!userDoc.exists) {
+        // ✅ CREATE USER if not exists
+        userData = {
+          uid,
+          email,
+          displayName: displayName || "User",
+          role: "student",
+          photoURL: "",
+          createdAt: new Date().toISOString(),
+          skillPoints: 0
+        };
+
+        await userRef.set(userData);
+      } else {
+        userData = userDoc.data();
+      }
+
+      // ✅ SIGN TOKEN
+      const token = jwt.sign(
+        { uid: userData.uid, email: userData.email },
+        JWT_SECRET,
+        { expiresIn: "7d" }
+      );
+
+      res.json({ token });
+
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
   });
 
   app.get("/api/auth/profile", authMiddleware, async (req: any, res) => {
     const currentDb = await getDbInstance();
-    if (!currentDb) return res.status(500).json({ error: "Database not ready" });
+    if (!currentDb) return res.status(500).json({ error: "DB not ready" });
 
     try {
       const { uid } = req.user;
+
       const userDoc = await currentDb.collection("users").doc(uid).get();
 
       if (!userDoc.exists) {
-        return res.status(404).json({ error: "User profile not found in Firestore" });
+        return res.status(404).json({ error: "Profile Not Found" });
       }
 
-      res.json({
-        id: userDoc.id,
-        ...userDoc.data()
-      });
-    } catch (error: any) {
-      console.error("Error fetching profile:", error);
-      res.status(500).json({ error: "Internal server error" });
+      res.json(userDoc.data());
+
+    } catch (error) {
+      console.error("Profile error:", error);
+      res.status(500).json({ error: "Internal error" });
     }
   });
 
