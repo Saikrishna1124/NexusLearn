@@ -1,422 +1,181 @@
-import React, { useState } from 'react';
-import { motion } from 'motion/react';
-import { X, Upload, CheckCircle, AlertCircle, Plus, Trash2, Sparkles, Loader2, Video } from 'lucide-react';
-import GlassPanel from '../ui/GlassPanel';
-import { generateTopicQuiz, generateOverallQuiz } from '../../services/aiService';
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Fields: uid, email, displayName, role, photoURL, createdAt, bio
+    //
+    // Collection: courses
+    // Fields: title, description, category, price, thumbnail, status, createdAt
+    //
+    // Collection: courses/{courseId}/lessons
+    // Fields: courseId, title, content, videoUrl, pdfUrl, order, summary
+    //
+    // Collection: enrollments
+    // Fields: studentId, courseId, progress, completedLessons, enrolledAt
+    //
+    // Collection: chats
+    // Fields: userId, lessonId, messages
+    //
+    // Collection: course_notes
+    // Fields: userId, courseId, content, updatedAt
+    //
+    // Collection: support_messages
+    // Fields: userId, userEmail, userName, subject, message, courseId, courseTitle, status, createdAt, updatedAt, replies
+    //
+    // Collection: social_posts
+    // Fields: userId, userName, userPhoto, title, text, imageUrl, videoUrl, description, createdAt, likes
+    //
+    // Collection: social_replies
+    // Fields: postId, userId, userName, userPhoto, text, createdAt
+    //
+    // ===============================================================
 
-interface Topic {
-  id: string;
-  title: string;
-  videoUrl: string;
-  quiz?: any[];
-}
-
-interface AddCourseModalProps {
-  onClose: () => void;
-  onAdd: (course: any) => void;
-  initialInstructorName?: string;
-  editingCourse?: any;
-}
-
-export default function AddCourseModal({ onClose, onAdd, initialInstructorName, editingCourse }: AddCourseModalProps) {
-  const [title, setTitle] = useState(editingCourse?.title || '');
-  const [instructor, setInstructor] = useState(editingCourse?.instructor || initialInstructorName || '');
-  const [difficulty, setDifficulty] = useState(editingCourse?.level || 'Beginner');
-  const [description, setDescription] = useState(editingCourse?.description || '');
-  const [content, setContent] = useState(editingCourse?.content || '');
-  const [isUploading, setIsUploading] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
-  const [thumbnail, setThumbnail] = useState<File | null>(null);
-  const [topics, setTopics] = useState<Topic[]>(editingCourse?.topics || []);
-  const [overallQuiz, setOverallQuiz] = useState<any[] | null>(editingCourse?.overallQuiz || null);
-  const [generatingQuiz, setGeneratingQuiz] = useState<string | null>(null); // topicId or 'overall'
-  const [error, setError] = useState<string | null>(null);
-
-  const addTopic = () => {
-    setTopics([...topics, { id: Date.now().toString(), title: '', videoUrl: '' }]);
-  };
-
-  const removeTopic = (id: string) => {
-    setTopics(topics.filter(t => t.id !== id));
-  };
-
-  const updateTopic = (id: string, field: keyof Topic, value: string) => {
-    setTopics(topics.map(t => t.id === id ? { ...t, [field]: value } : t));
-  };
-
-  const handleGenerateTopicQuiz = async (topic: Topic) => {
-    if (!topic.title) {
-      setError('Please enter a topic title first.');
-      return;
-    }
-    setGeneratingQuiz(topic.id);
-    setError(null);
-    try {
-      const quiz = await generateTopicQuiz(topic.title, content || description);
-      setTopics(topics.map(t => t.id === topic.id ? { ...t, quiz } : t));
-    } catch (err: any) {
-      console.error('Failed to generate topic quiz:', err);
-      setError(err.message || 'Failed to generate quiz. Please try again.');
-    } finally {
-      setGeneratingQuiz(null);
-    }
-  };
-
-  const handleGenerateOverallQuiz = async () => {
-    if (!title) {
-      setError('Please enter a course title first.');
-      return;
-    }
-    setGeneratingQuiz('overall');
-    setError(null);
-    try {
-      const quiz = await generateOverallQuiz(title, content || description);
-      setOverallQuiz(quiz);
-    } catch (err: any) {
-      console.error('Failed to generate overall quiz:', err);
-      setError(err.message || 'Failed to generate overall quiz. Please try again.');
-    } finally {
-      setGeneratingQuiz(null);
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-    }
-  };
-
-  const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      setThumbnail(selectedFile);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsUploading(true);
-    setError(null);
-
-    const formData = new FormData();
-    formData.append('title', title);
-    formData.append('instructor', instructor);
-    formData.append('content', content);
-    formData.append('level', difficulty);
-    formData.append('description', description);
-    formData.append('topics', JSON.stringify(topics));
-    formData.append('overallQuiz', JSON.stringify(overallQuiz));
-    if (file) {
-      formData.append('pdf', file);
-    }
-    if (thumbnail) {
-      formData.append('thumbnail', thumbnail);
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    try {
-      const url = editingCourse ? `/api/courses/${editingCourse.id}` : '/api/courses';
-      const method = editingCourse ? 'PUT' : 'POST';
-      
-      const response = await fetch(url, {
-        method,
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        const serverError = errorData.error || errorData.details || `Failed to ${editingCourse ? 'update' : 'create'} course`;
-        const stack = errorData.stack ? `\n\nStack Trace:\n${errorData.stack}` : '';
-        throw new Error(`${serverError}${stack}`);
-      }
-
-      const data = await response.json();
-      
-      onAdd({
-        id: editingCourse ? editingCourse.id : data.courseId,
-        title,
-        instructor,
-        level: difficulty,
-        description,
-        content,
-        enrollmentCount: editingCourse?.enrollmentCount || 0,
-        published: editingCourse?.published || false,
-        thumbnailUrl: data.thumbnailUrl || editingCourse?.thumbnailUrl || `https://picsum.photos/seed/${title.replace(/\s+/g, '').toLowerCase()}/800/600`,
-      });
-      onClose();
-    } catch (err: any) {
-      console.error('Upload error:', err);
-      setError(err.message || `Failed to ${editingCourse ? 'update' : 'upload'} course. Please try again.`);
-    } finally {
-      setIsUploading(false);
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
     }
-  };
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm overflow-y-auto">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-2xl my-auto"
-      >
-        <GlassPanel className="relative border-neonBlue/30">
-          <button onClick={onClose} className="absolute top-6 right-6 p-2 hover:bg-white/5 rounded-lg">
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "saikrishnagummadidala34@gmail.com" && request.auth.token.email_verified == true));
+    }
 
-          <h2 className="text-3xl font-bold mb-8">{editingCourse ? 'Edit Course' : 'Add New Course'}</h2>
+    function isStudent() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student';
+    }
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-400 text-sm">
-                <AlertCircle className="w-5 h-5" />
-                {error}
-              </div>
-            )}
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-xs font-mono text-neonBlue uppercase tracking-widest">Course Title</label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-neonBlue/50"
-                  placeholder="e.g. Advanced Quantum Computing"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-mono text-neonBlue uppercase tracking-widest">Instructor Name</label>
-                <input
-                  type="text"
-                  value={instructor}
-                  onChange={(e) => setInstructor(e.target.value)}
-                  className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-neonBlue/50"
-                  placeholder="Dr. Jane Smith"
-                  required
-                />
-              </div>
-            </div>
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
 
-            <div className="space-y-2">
-              <label className="text-xs font-mono text-neonBlue uppercase tracking-widest">Description</label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-neonBlue/50 h-24 resize-none"
-                placeholder="Briefly describe the course..."
-                required
-              />
-            </div>
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'role', 'photoURL', 'createdAt']) &&
+             data.uid is string && data.email is string && isValidEmail(data.email) &&
+             data.role in ['student', 'admin'];
+    }
 
-            <div className="space-y-2">
-              <label className="text-xs font-mono text-neonBlue uppercase tracking-widest">Course Content (Markdown)</label>
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-neonBlue/50 h-32 resize-none"
-                placeholder="Detailed course content..."
-              />
-            </div>
+    function isValidCourse(data) {
+      return hasOnlyAllowedFields(['title', 'description', 'pdfUrl', 'thumbnailUrl', 'published', 'createdAt', 'enrollmentCount', 'instructor', 'level', 'content']) &&
+             data.title is string && data.published is bool;
+    }
 
-            <div className="space-y-2">
-              <label className="text-xs font-mono text-neonBlue uppercase tracking-widest">Difficulty Level</label>
-              <div className="flex gap-4">
-                {['Beginner', 'Intermediate', 'Advanced'].map((level) => (
-                  <button
-                    key={level}
-                    type="button"
-                    onClick={() => setDifficulty(level)}
-                    className={`flex-1 py-3 rounded-xl border transition-all font-bold text-sm ${difficulty === level
-                        ? 'bg-neonBlue/20 border-neonBlue text-neonBlue'
-                        : 'bg-white/5 border-white/10 text-gray-500 hover:border-white/30'
-                      }`}
-                  >
-                    {level}
-                  </button>
-                ))}
-              </div>
-            </div>
+    function isValidEnrollment(data) {
+      return hasOnlyAllowedFields(['userId', 'courseId', 'progress', 'enrolledAt']) &&
+             data.userId is string && data.courseId is string;
+    }
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-mono text-neonBlue uppercase tracking-widest">Course Topics & Videos</label>
-                <button
-                  type="button"
-                  onClick={addTopic}
-                  className="flex items-center gap-2 text-xs font-bold text-neonBlue hover:text-white transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Topic
-                </button>
-              </div>
-              
-              <div className="space-y-4">
-                {topics.map((topic, index) => (
-                  <div key={topic.id} className="p-6 rounded-2xl bg-white/5 border border-white/10 space-y-4 relative group">
-                    <button
-                      type="button"
-                      onClick={() => removeTopic(topic.id)}
-                      className="absolute top-4 right-4 p-2 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">Topic {index + 1} Title</label>
-                        <input
-                          type="text"
-                          value={topic.title}
-                          onChange={(e) => updateTopic(topic.id, 'title', e.target.value)}
-                          className="w-full bg-black/40 border border-white/10 rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-neonBlue/50"
-                          placeholder="e.g. Introduction to Quantum"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">Video URL</label>
-                        <div className="relative">
-                          <Video className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                          <input
-                            type="text"
-                            value={topic.videoUrl}
-                            onChange={(e) => updateTopic(topic.id, 'videoUrl', e.target.value)}
-                            className="w-full bg-black/40 border border-white/10 rounded-xl py-2 pl-10 pr-3 text-sm text-white focus:outline-none focus:border-neonBlue/50"
-                            placeholder="https://youtube.com/..."
-                          />
-                        </div>
-                      </div>
-                    </div>
+    function isValidCourseRequest(data) {
+      return hasOnlyAllowedFields(['userId', 'userEmail', 'userName', 'courseId', 'courseTitle', 'status', 'requestedAt', 'updatedAt']) &&
+             data.userId is string && data.courseId is string &&
+             data.status in ['pending', 'approved', 'rejected'];
+    }
 
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {topic.quiz ? (
-                          <div className="flex items-center gap-1 text-neonGreen text-[10px] font-bold uppercase">
-                            <CheckCircle className="w-3 h-3" />
-                            Quiz Generated ({topic.quiz.length} questions)
-                          </div>
-                        ) : (
-                          <div className="text-[10px] text-gray-500 font-bold uppercase">No Quiz Generated</div>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleGenerateTopicQuiz(topic)}
-                        disabled={generatingQuiz === topic.id}
-                        className="flex items-center gap-2 text-[10px] font-bold text-indigo-400 hover:text-white transition-colors disabled:opacity-50"
-                      >
-                        {generatingQuiz === topic.id ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <Sparkles className="w-3 h-3" />
-                        )}
-                        {topic.quiz ? 'Regenerate Quiz' : 'Generate AI Quiz'}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                
-                {topics.length === 0 && (
-                  <div className="text-center py-8 border-2 border-dashed border-white/5 rounded-2xl text-gray-500 text-sm italic">
-                    No topics added yet. Add topics to include videos and quizzes.
-                  </div>
-                )}
-              </div>
-            </div>
+    function isValidCourseNote(data) {
+      return hasOnlyAllowedFields(['userId', 'courseId', 'content', 'updatedAt']) &&
+             data.userId is string && data.courseId is string && data.content is string;
+    }
 
-            <div className="p-6 rounded-2xl bg-indigo-600/5 border border-indigo-600/20 flex items-center justify-between">
-              <div>
-                <h4 className="text-sm font-bold text-white mb-1">Overall Course Quiz</h4>
-                <p className="text-[10px] text-gray-500">Generate a comprehensive quiz (10-15 questions) for the entire course.</p>
-                {overallQuiz && (
-                  <div className="mt-2 flex items-center gap-1 text-neonGreen text-[10px] font-bold uppercase">
-                    <CheckCircle className="w-3 h-3" />
-                    Overall Quiz Ready ({overallQuiz.length} questions)
-                  </div>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={handleGenerateOverallQuiz}
-                disabled={generatingQuiz === 'overall'}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600/20 border border-indigo-600/30 text-indigo-400 text-xs font-bold hover:bg-indigo-600 hover:text-white transition-all disabled:opacity-50"
-              >
-                {generatingQuiz === 'overall' ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Sparkles className="w-4 h-4" />
-                )}
-                {overallQuiz ? 'Regenerate Overall Quiz' : 'Generate Overall Quiz'}
-              </button>
-            </div>
+    function isValidSupportMessage(data) {
+      return hasOnlyAllowedFields(['userId', 'userEmail', 'userName', 'subject', 'message', 'courseId', 'courseTitle', 'status', 'createdAt', 'updatedAt', 'replies']) &&
+             data.userId is string && data.subject is string && data.message is string &&
+             data.status in ['open', 'replied', 'closed'];
+    }
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-xs font-mono text-neonBlue uppercase tracking-widest">Course Materials (PDF)</label>
-                <input
-                  type="file"
-                  id="course-file"
-                  className="hidden"
-                  accept=".pdf"
-                  onChange={handleFileChange}
-                />
-                <label
-                  htmlFor="course-file"
-                  className="border-2 border-dashed border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 hover:border-neonBlue/30 cursor-pointer transition-colors group h-32"
-                >
-                  {file ? (
-                    <div className="flex flex-col items-center gap-1">
-                      <CheckCircle className="text-neonGreen w-6 h-6" />
-                      <p className="text-neonGreen font-bold text-xs truncate max-w-[150px]">{file.name}</p>
-                    </div>
-                  ) : (
-                    <>
-                      <Upload className="text-gray-500 group-hover:text-neonBlue w-6 h-6" />
-                      <p className="text-white font-bold text-xs">Select PDF</p>
-                    </>
-                  )}
-                </label>
-              </div>
+    function isValidSocialPost(data) {
+      return hasOnlyAllowedFields(['userId', 'userName', 'userPhoto', 'title', 'text', 'imageUrl', 'videoUrl', 'description', 'createdAt', 'likes']) &&
+             data.userId is string && data.userName is string && data.title is string && data.createdAt is string;
+    }
 
-              <div className="space-y-2">
-                <label className="text-xs font-mono text-neonBlue uppercase tracking-widest">Thumbnail Image</label>
-                <input
-                  type="file"
-                  id="thumbnail-file"
-                  className="hidden"
-                  accept="image/*"
-                  onChange={handleThumbnailChange}
-                />
-                <label
-                  htmlFor="thumbnail-file"
-                  className="border-2 border-dashed border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 hover:border-neonBlue/30 cursor-pointer transition-colors group h-32"
-                >
-                  {thumbnail ? (
-                    <div className="flex flex-col items-center gap-1">
-                      <CheckCircle className="text-neonGreen w-6 h-6" />
-                      <p className="text-neonGreen font-bold text-xs truncate max-w-[150px]">{thumbnail.name}</p>
-                    </div>
-                  ) : (
-                    <>
-                      <Upload className="text-gray-500 group-hover:text-neonBlue w-6 h-6" />
-                      <p className="text-white font-bold text-xs">Select Image</p>
-                    </>
-                  )}
-                </label>
-              </div>
-            </div>
+    function isValidSocialReply(data) {
+      return hasOnlyAllowedFields(['postId', 'userId', 'userName', 'userPhoto', 'text', 'createdAt']) &&
+             data.postId is string && data.userId is string && data.userName is string && data.text is string && data.createdAt is string;
+    }
 
-            <button
-              type="submit"
-              disabled={isUploading}
-              className="w-full py-4 bg-neonBlue text-black font-bold rounded-xl hover:bg-white transition-all shadow-[0_0_30px_rgba(0,212,255,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isUploading ? (editingCourse ? 'Updating...' : 'Creating Course...') : (editingCourse ? 'Update Course' : 'Create Course')}
-            </button>
-          </form>
-        </GlassPanel>
-      </motion.div>
-    </div>
-  );
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{uid} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isOwner(uid) && isValidUser(request.resource.data) && (request.resource.data.role == 'student' || isAdmin());
+      allow update: if isAuthenticated() && (isOwner(uid) || isAdmin()) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /courses/{courseId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /enrollments/{enrollmentId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if isAuthenticated() && (request.auth.uid == request.resource.data.userId || isAdmin()) && isValidEnrollment(request.resource.data);
+      allow update: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin()) && isValidEnrollment(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /course_requests/{requestId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId && isValidCourseRequest(request.resource.data) && request.resource.data.status == 'pending';
+      allow update: if isAdmin() && isValidCourseRequest(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /quizzes/{quizId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /quiz_results/{resultId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+      allow update, delete: if isAdmin();
+    }
+
+    match /course_notes/{noteId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId && isValidCourseNote(request.resource.data);
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId && isValidCourseNote(request.resource.data);
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    match /support_messages/{messageId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId && isValidSupportMessage(request.resource.data) && request.resource.data.status == 'open';
+      allow update: if isAuthenticated() && (isAdmin() || (request.auth.uid == resource.data.userId && isValidSupportMessage(request.resource.data)));
+      allow delete: if isAdmin();
+    }
+
+    match /social_posts/{postId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId && isValidSocialPost(request.resource.data);
+      allow update: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin() || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes'])));
+      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+    }
+
+    match /social_replies/{replyId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId && isValidSocialReply(request.resource.data);
+      allow update: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+    }
+  }
 }
