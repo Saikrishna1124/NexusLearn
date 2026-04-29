@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
+import { useAuth } from '../context/AuthContext';
 
 export const AuthPage = ({ mode }: { mode: 'login' | 'signup' }) => {
   const [email, setEmail] = useState('');
@@ -15,6 +16,7 @@ export const AuthPage = ({ mode }: { mode: 'login' | 'signup' }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const { setToken } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,35 +24,57 @@ export const AuthPage = ({ mode }: { mode: 'login' | 'signup' }) => {
     setError('');
 
     try {
+      let firebaseUser;
+      let finalRole: string = role;
+
       if (mode === 'signup') {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
+        firebaseUser = userCredential.user;
+        await updateProfile(firebaseUser, { displayName: name });
 
-        await updateProfile(user, { displayName: name });
-
-        // Create profile in Firestore
         const isAdminEmail = email === 'admin@gmail.com' || email === 'saikrishnagummadidala34@gmail.com';
-        const finalRole = isAdminEmail ? 'admin' : role;
+        finalRole = isAdminEmail ? 'admin' : role;
 
-        await setDoc(doc(db, 'users', user.uid), {
-          uid: user.uid,
-          email: user.email,
+        await setDoc(doc(db, 'users', firebaseUser.uid), {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
           displayName: name,
           role: finalRole,
           photoURL: '',
           createdAt: new Date().toISOString()
         });
-
-        if (finalRole === 'admin') navigate('/admin/dashboard');
-        else navigate('/student/dashboard');
       } else {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        // AuthContext will handle navigation via DashboardRedirect in App.tsx
-        // but we can also do it here for immediate feedback
+        firebaseUser = userCredential.user;
         const isAdminEmail = email === 'admin@gmail.com' || email === 'saikrishnagummadidala34@gmail.com';
-        if (isAdminEmail) navigate('/admin/dashboard');
-        else navigate('/dashboard');
+        finalRole = isAdminEmail ? 'admin' : 'student'; // Fallback to student if not admin
       }
+
+      // Get JWT from backend
+      try {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            displayName: firebaseUser.displayName || name,
+            role: finalRole
+          })
+        });
+
+        if (response.ok) {
+          const { token } = await response.json();
+          setToken(token);
+        }
+      } catch (jwtErr) {
+        console.error("Failed to get JWT from backend:", jwtErr);
+        // We continue anyway if firebase succeeded, but profile might fail later
+      }
+
+      if (finalRole === 'admin') navigate('/admin/dashboard');
+      else navigate('/dashboard');
+
     } catch (err: any) {
       setError(err.message);
     } finally {

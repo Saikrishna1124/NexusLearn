@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Navbar = () => {
-  const { user, loading } = useAuth();
+  const { profile, loading } = useAuth();
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-black/50 backdrop-blur-xl border-b border-white/10">
@@ -27,7 +27,7 @@ const Navbar = () => {
           </div>
 
           <div className="flex items-center gap-4">
-            {!loading && user ? (
+            {!loading && profile ? (
               <Link to="/dashboard" className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-full font-medium transition-all">
                 Go to Dashboard
               </Link>

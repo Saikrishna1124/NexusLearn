@@ -11,8 +11,11 @@ import admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { getStorage } from "firebase-admin/storage";
+import jwt from "jsonwebtoken";
 
 dotenv.config();
+
+const JWT_SECRET = process.env.JWT_SECRET || "nexus-learn-secret-key-2026";
 
 // Cloudinary configuration
 const cloudinaryCloudName =
@@ -637,6 +640,62 @@ async function startServer() {
       databaseId: db ? db.databaseId : firebaseConfig.firestoreDatabaseId,
       lastError: lastDbError,
     });
+  });
+
+  // JWT Middleware
+  const authMiddleware = async (req: any, res: any, next: any) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "No token provided" });
+    }
+
+    const token = authHeader.split(" ")[1];
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      req.user = decoded;
+      next();
+    } catch (error) {
+      return res.status(401).json({ error: "Invalid or expired token" });
+    }
+  };
+
+  // Auth Routes
+  app.post("/api/auth/login", async (req, res) => {
+    const { email, uid, displayName, role } = req.body;
+    
+    if (!uid || !email) {
+      return res.status(400).json({ error: "Missing user information" });
+    }
+
+    const token = jwt.sign(
+      { uid, email, role: role || 'student', displayName },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.json({ token, success: true });
+  });
+
+  app.get("/api/auth/profile", authMiddleware, async (req: any, res) => {
+    const currentDb = await getDbInstance();
+    if (!currentDb) return res.status(500).json({ error: "Database not ready" });
+
+    try {
+      const { uid } = req.user;
+      const userDoc = await currentDb.collection("users").doc(uid).get();
+
+      if (!userDoc.exists) {
+        return res.status(404).json({ error: "User profile not found in Firestore" });
+      }
+
+      res.json({
+        id: userDoc.id,
+        ...userDoc.data()
+      });
+    } catch (error: any) {
+      console.error("Error fetching profile:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
   });
 
   const getDbInstance = async () => {
