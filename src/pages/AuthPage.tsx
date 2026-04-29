@@ -16,10 +16,12 @@ export const AuthPage = ({ mode }: { mode: 'login' | 'signup' }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const { setToken } = useAuth();
+  const { loginWithFirebase } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
+    // 1️⃣ ALWAYS call preventDefault first
     e.preventDefault();
+    
     setLoading(true);
     setError('');
 
@@ -46,36 +48,18 @@ export const AuthPage = ({ mode }: { mode: 'login' | 'signup' }) => {
       } else {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         firebaseUser = userCredential.user;
-        const isAdminEmail = email === 'admin@gmail.com' || email === 'saikrishnagummadidala34@gmail.com';
-        finalRole = isAdminEmail ? 'admin' : 'student'; // Fallback to student if not admin
+        // Role will be fetched from Firestore via loginWithFirebase
       }
 
-      // Get JWT from backend
-      try {
-        const response = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            displayName: firebaseUser.displayName || name,
-            role: finalRole
-          })
-        });
+      // 2️⃣ Use the new loginWithFirebase method (handles JWT + Profile)
+      await loginWithFirebase(firebaseUser);
 
-        if (response.ok) {
-          const { token } = await response.json();
-          setToken(token);
-        }
-      } catch (jwtErr) {
-        console.error("Failed to get JWT from backend:", jwtErr);
-        // We continue anyway if firebase succeeded, but profile might fail later
-      }
-
-      if (finalRole === 'admin') navigate('/admin/dashboard');
-      else navigate('/dashboard');
+      // 3️⃣ Navigation will happen automatically via DashboardRedirect or manually here
+      // To be safe, we check the role once the profile is loaded, but we can navigate to /dashboard
+      navigate('/dashboard');
 
     } catch (err: any) {
+      console.error("Login/Signup error:", err);
       setError(err.message);
     } finally {
       setLoading(false);
