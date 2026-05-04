@@ -19,7 +19,6 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { logout } from '../../firebase';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Starfield } from '../3d/Starfield';
 import { AITutorWidget } from '../AITutorWidget';
@@ -55,9 +54,18 @@ const SidebarItem = ({ icon: Icon, label, active, to, onClick }: { icon: any, la
 
 export const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const { profile } = useAuth();
+  const { profile, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
   const menuItems = profile?.role === 'admin'
     ? [
@@ -125,7 +133,7 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
           </div>
 
           <div className="pt-6 border-t border-white/10">
-            <SidebarItem icon={LogOut} label="Logout" onClick={logout} />
+            <SidebarItem icon={LogOut} label="Logout" onClick={handleLogout} />
           </div>
         </div>
       </motion.aside>
@@ -177,7 +185,7 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
                 alt="Profile"
               />
               <button
-                onClick={logout}
+                onClick={handleLogout}
                 className="p-2 hover:bg-red-500/10 text-gray-400 hover:text-red-400 rounded-lg transition-all"
                 title="Logout"
               >

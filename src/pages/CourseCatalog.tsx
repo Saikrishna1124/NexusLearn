@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Search, BookOpen, Users, ArrowRight, Loader2, Star, Clock, LayoutDashboard, LogOut, ChevronLeft, Clock3, CheckCircle2, XCircle } from 'lucide-react';
 import { collection, onSnapshot, query, where, addDoc, getDocs, serverTimestamp } from 'firebase/firestore';
-import { db, logout } from '../firebase';
+import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -12,7 +12,7 @@ export const CourseCatalog = () => {
   const [enrollmentCounts, setEnrollmentCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const { user, profile, isAdmin } = useAuth();
+  const { user, profile, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
