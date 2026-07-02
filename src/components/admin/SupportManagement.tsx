@@ -56,6 +56,8 @@ export const SupportManagement = () => {
                 const updated = msgs.find(m => m.id === selectedMessage.id);
                 if (updated) setSelectedMessage(updated);
             }
+        }, (err) => {
+            console.error('Error fetching support messages:', err);
         });
 
         return () => unsubscribe();

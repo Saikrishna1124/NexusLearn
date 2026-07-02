@@ -468,10 +468,10 @@ function getCloudinaryPublicId(url: string): string | null {
   }
 }
 
-async function startServer() {
+export const app = express();
+export async function startServer() {
   console.log("Starting NexusLearn server...");
 
-  const app = express();
   const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json());
@@ -1139,13 +1139,13 @@ async function startServer() {
     res.status(404).json({ error: `API route not found: ${req.originalUrl}` });
   });
 
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else {
+  } else if (!process.env.VERCEL) {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
@@ -1153,12 +1153,14 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(
-      `APP_URL: ${process.env.APP_URL || "Not set (using relative paths)"}`
-    );
-  });
+  if (!process.env.VERCEL) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on port ${PORT}`);
+      console.log(
+        `APP_URL: ${process.env.APP_URL || "Not set (using relative paths)"}`
+      );
+    });
+  }
 
   app.use(
     (
@@ -1175,8 +1177,12 @@ async function startServer() {
       });
     }
   );
+
+  return app;
 }
 
-startServer().catch((err) => {
-  console.error("Error starting server:", err);
-});
+if (!process.env.VERCEL) {
+  startServer().catch((err) => {
+    console.error("Error starting server:", err);
+  });
+}

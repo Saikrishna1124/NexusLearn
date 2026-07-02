@@ -54,13 +54,17 @@ export const AdminDashboard = () => {
       setLoading(false);
     }, (err) => {
       console.error('Failed to fetch students:', err);
-      setError(`Could not load students: ${err.message}`);
+      setError(`Failed to load students: ${err.message}`);
+      setLoading(false);
     });
 
     // Total Courses listener
     const qCourses = query(collection(db, 'courses'));
     const unsubscribeCourses = onSnapshot(qCourses, (snapshot) => {
       setStats(prev => ({ ...prev, totalCourses: snapshot.size }));
+    }, (err) => {
+      console.error('Failed to fetch courses:', err);
+      setError(`Failed to load courses: ${err.message}`);
     });
 
     // Total Enrollments listener
@@ -96,6 +100,9 @@ export const AdminDashboard = () => {
       })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
       setEnrollmentTrend(trend);
+    }, (err) => {
+      console.error('Failed to fetch enrollments:', err);
+      setError(`Failed to load enrollments: ${err.message}`);
     });
 
     return () => {
