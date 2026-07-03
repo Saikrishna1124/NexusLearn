@@ -167,7 +167,10 @@ const testDb = async (dbInstance: any, label: string) => {
       setTimeout(() => reject(new Error("Timeout connecting to Firestore")), 2000)
     );
 
-    const fetchPromise = dbInstance.collection("courses").limit(1).get();
+    const fetchPromise = dbInstance.collection("courses").limit(1).get().catch((e: any) => {
+      console.warn("Background fetch rejected after timeout:", e.message);
+      throw e;
+    });
     const snap = (await Promise.race([fetchPromise, timeoutPromise])) as any;
 
     console.log(
@@ -212,7 +215,11 @@ const initializeDb = async () => {
 
   try {
     const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout verifying storage bucket")), 2000));
-    const [exists] = (await Promise.race([storageBucket.exists(), timeoutPromise])) as [boolean];
+    const storagePromise = storageBucket.exists().catch((e: any) => {
+      console.warn("Background storage verify rejected after timeout:", e.message);
+      throw e;
+    });
+    const [exists] = (await Promise.race([storagePromise, timeoutPromise])) as [boolean];
     if (!exists) {
       console.warn(
         `Storage bucket ${bucketName} does not exist. Uploads will use Cloudinary/fallbacks.`
@@ -667,23 +674,26 @@ export async function startServer() {
 
   // Auth Routes
   app.post("/api/auth/login", async (req, res) => {
-    const { uid, email, displayName } = req.body;
-
-    if (!uid || !email) {
-      return res.status(400).json({ error: "Missing user data" });
-    }
-
-    const currentDb = await getDbInstance();
-    if (!currentDb) return res.status(500).json({ error: "DB not ready" });
-
     try {
+      if (!req.body) {
+        return res.status(400).json({ error: "Request body is undefined" });
+      }
+
+      const { uid, email, displayName } = req.body;
+
+      if (!uid || !email) {
+        return res.status(400).json({ error: "Missing user data" });
+      }
+
+      const currentDb = await getDbInstance();
+      if (!currentDb) return res.status(500).json({ error: "DB not ready" });
+
       const userRef = currentDb.collection("users").doc(uid);
       const userDoc = await userRef.get();
 
       let userData;
 
       if (!userDoc.exists) {
-        // ✅ CREATE USER if not exists
         userData = {
           uid,
           email,
@@ -693,32 +703,30 @@ export async function startServer() {
           createdAt: new Date().toISOString(),
           skillPoints: 0
         };
-
         await userRef.set(userData);
       } else {
         userData = userDoc.data();
       }
 
-      // ✅ SIGN TOKEN
       const token = jwt.sign(
         { uid: userData.uid, email: userData.email },
         JWT_SECRET,
         { expiresIn: "7d" }
       );
 
-      res.json({ token });
+      return res.json({ token });
 
-    } catch (error) {
-      console.error("Login error:", error);
-      res.status(500).json({ error: "Internal server error" });
+    } catch (error: any) {
+      console.error("Login route unhandled error:", error);
+      return res.status(500).json({ error: `Login crash: ${error.message}` });
     }
   });
 
   app.get("/api/auth/profile", authMiddleware, async (req: any, res) => {
-    const currentDb = await getDbInstance();
-    if (!currentDb) return res.status(500).json({ error: "DB not ready" });
-
     try {
+      const currentDb = await getDbInstance();
+      if (!currentDb) return res.status(500).json({ error: "DB not ready" });
+
       const { uid } = req.user;
 
       const userDoc = await currentDb.collection("users").doc(uid).get();
@@ -727,11 +735,11 @@ export async function startServer() {
         return res.status(404).json({ error: "Profile Not Found" });
       }
 
-      res.json(userDoc.data());
+      return res.json(userDoc.data());
 
-    } catch (error) {
-      console.error("Profile error:", error);
-      res.status(500).json({ error: "Internal error" });
+    } catch (error: any) {
+      console.error("Profile route unhandled error:", error);
+      return res.status(500).json({ error: `Profile crash: ${error.message}` });
     }
   });
 
@@ -756,7 +764,10 @@ export async function startServer() {
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("Timeout connecting to Firestore")), 2000)
       );
-      const fetchPromise = db.collection("courses").limit(1).get();
+      const fetchPromise = db.collection("courses").limit(1).get().catch((e: any) => {
+        console.warn("Background fetch rejected after timeout in getDbInstance:", e.message);
+        throw e;
+      });
       await Promise.race([fetchPromise, timeoutPromise]);
       return db;
     } catch (error: any) {
@@ -770,7 +781,10 @@ export async function startServer() {
           try {
             const defaultDb = getFirestore(firebaseApp!);
             const defaultTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout on default db")), 2000));
-            const fetchDefault = defaultDb.collection("courses").limit(1).get();
+            const fetchDefault = defaultDb.collection("courses").limit(1).get().catch((e: any) => {
+              console.warn("Background fetch default rejected after timeout:", e.message);
+              throw e;
+            });
             await Promise.race([fetchDefault, defaultTimeout]);
             db = defaultDb;
             console.log("Successfully fell back to default database.");
