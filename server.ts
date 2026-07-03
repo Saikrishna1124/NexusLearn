@@ -211,7 +211,8 @@ const initializeDb = async () => {
   storageBucket = getStorage(firebaseApp).bucket(bucketName);
 
   try {
-    const [exists] = await storageBucket.exists();
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout verifying storage bucket")), 2000));
+    const [exists] = (await Promise.race([storageBucket.exists(), timeoutPromise])) as [boolean];
     if (!exists) {
       console.warn(
         `Storage bucket ${bucketName} does not exist. Uploads will use Cloudinary/fallbacks.`
@@ -768,7 +769,9 @@ export async function startServer() {
           console.warn("Attempting fallback to default database...");
           try {
             const defaultDb = getFirestore(firebaseApp!);
-            await defaultDb.collection("courses").limit(1).get();
+            const defaultTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout on default db")), 2000));
+            const fetchDefault = defaultDb.collection("courses").limit(1).get();
+            await Promise.race([fetchDefault, defaultTimeout]);
             db = defaultDb;
             console.log("Successfully fell back to default database.");
             return db;
