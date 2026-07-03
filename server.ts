@@ -168,7 +168,6 @@ const testDb = async (dbInstance: any, label: string) => {
 
     const fetchPromise = dbInstance.collection("courses").limit(1).get().catch((e: any) => {
       console.warn("Background fetch rejected after timeout:", e.message);
-      throw e;
     });
     const snap = (await Promise.race([fetchPromise, timeoutPromise])) as any;
 
@@ -216,7 +215,6 @@ const initializeDb = async () => {
     const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout verifying storage bucket")), 2000));
     const storagePromise = storageBucket.exists().catch((e: any) => {
       console.warn("Background storage verify rejected after timeout:", e.message);
-      throw e;
     });
     const [exists] = (await Promise.race([storagePromise, timeoutPromise])) as [boolean];
     if (!exists) {
@@ -754,7 +752,6 @@ export async function startServer() {
       );
       const fetchPromise = db.collection("courses").limit(1).get().catch((e: any) => {
         console.warn("Background fetch rejected after timeout in getDbInstance:", e.message);
-        throw e;
       });
       await Promise.race([fetchPromise, timeoutPromise]);
       return db;
@@ -771,7 +768,6 @@ export async function startServer() {
             const defaultTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout on default db")), 2000));
             const fetchDefault = defaultDb.collection("courses").limit(1).get().catch((e: any) => {
               console.warn("Background fetch default rejected after timeout:", e.message);
-              throw e;
             });
             await Promise.race([fetchDefault, defaultTimeout]);
             db = defaultDb;
