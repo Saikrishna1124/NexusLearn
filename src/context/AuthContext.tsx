@@ -69,10 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     init();
   }, [token]);
 
-  // 🔥 LOGIN FLOW (call this after Firebase login)
   const loginWithFirebase = async (firebaseUser: FirebaseUser) => {
-    setUser(firebaseUser);
-
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -83,12 +80,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       })
     });
 
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || `Server error: ${res.statusText}`);
+    }
+
     const data = await res.json();
 
     localStorage.setItem('nexus_token', data.token);
     setToken(data.token);
 
-    await fetchProfile(data.token);
+    const profileFetched = await fetchProfile(data.token);
+    if (!profileFetched) {
+      throw new Error("Failed to fetch user profile after login");
+    }
+
+    // 🔥 SET USER ONLY AFTER EVERYTHING SUCCEEDS
+    setUser(firebaseUser);
   };
 
   const logout = async () => {

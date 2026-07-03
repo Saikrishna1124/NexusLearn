@@ -164,7 +164,7 @@ const getFirebaseApp = async () => {
 const testDb = async (dbInstance: any, label: string) => {
   try {
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Timeout connecting to Firestore")), 5000)
+      setTimeout(() => reject(new Error("Timeout connecting to Firestore")), 2000)
     );
 
     const fetchPromise = dbInstance.collection("courses").limit(1).get();
@@ -474,7 +474,12 @@ export async function startServer() {
 
   const PORT = Number(process.env.PORT) || 3000;
 
-  app.use(express.json());
+  app.use((req, res, next) => {
+    if (req.body && typeof req.body === 'object') {
+      return next();
+    }
+    express.json()(req, res, next);
+  });
   app.use(cookieParser());
   app.use("/uploads", express.static("uploads"));
 
@@ -748,7 +753,7 @@ export async function startServer() {
 
     try {
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Timeout connecting to Firestore")), 5000)
+        setTimeout(() => reject(new Error("Timeout connecting to Firestore")), 2000)
       );
       const fetchPromise = db.collection("courses").limit(1).get();
       await Promise.race([fetchPromise, timeoutPromise]);
