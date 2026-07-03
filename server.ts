@@ -83,10 +83,16 @@ let lastDbError: any = null;
 
 // Read service account JSON from Render env
 const getServiceAccountFromEnv = () => {
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+  let raw = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (!raw) return null;
 
   try {
+    // Vercel sometimes wraps pasted JSON in quotes or double escapes newlines
+    if (raw.startsWith("'") && raw.endsWith("'")) raw = raw.slice(1, -1);
+    else if (raw.startsWith('"') && raw.endsWith('"') && !raw.startsWith('"{')) raw = raw.slice(1, -1);
+    
+    raw = raw.replace(/\\\\n/g, "\\n");
+
     const parsed = JSON.parse(raw);
     if (parsed.private_key) {
       parsed.private_key = parsed.private_key.replace(/\\n/g, "\n");
@@ -94,6 +100,7 @@ const getServiceAccountFromEnv = () => {
     return parsed;
   } catch (error: any) {
     console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT:", error.message);
+    console.error("Raw snippet:", raw.substring(0, 20) + "...");
     return null;
   }
 };
