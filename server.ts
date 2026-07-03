@@ -744,17 +744,6 @@ export async function startServer() {
 
   const getDbInstance = async () => {
     if (!db) {
-      console.log("Global db variable is null. Attempting re-initialization...");
-      try {
-        db = await initializeDb();
-      } catch (e: any) {
-        lastDbError = `Re-initialization failed: ${e.message}`;
-        console.error(lastDbError);
-        return null;
-      }
-    }
-
-    if (!db) {
       lastDbError = "Database initialization returned null. Check server logs.";
       return null;
     }
