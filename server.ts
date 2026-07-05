@@ -18,11 +18,11 @@ const JWT_SECRET = process.env.JWT_SECRET || "nexus-learn-secret-key-2026";
 
 // Cloudinary configuration
 const cloudinaryCloudName =
-  process.env.CLOUDINARY_CLOUD_NAME || process.env.cloud_name || "";
+  process.env.CLOUDINARY_CLOUD_NAME || process.env.Cloudinary_cloud_name || process.env.cloud_name || "";
 const cloudinaryApiKey =
-  process.env.CLOUDINARY_API_KEY || process.env.api_key || "";
+  process.env.CLOUDINARY_API_KEY || process.env.Cloudinary_api_key || process.env.api_key || "";
 const cloudinaryApiSecret =
-  process.env.CLOUDINARY_API_SECRET || process.env.api_secret || "";
+  process.env.CLOUDINARY_API_SECRET || process.env.Cloudinary_api_secret || process.env.api_secret || "";
 
 const cleanValue = (val: string) => val.replace(/[,]$/, "").trim();
 
@@ -32,7 +32,7 @@ cloudinary.config({
   api_secret: cleanValue(cloudinaryApiSecret),
 });
 
-if (!process.env.CLOUDINARY_CLOUD_NAME && !process.env.cloud_name) {
+if (!process.env.CLOUDINARY_CLOUD_NAME && !process.env.Cloudinary_cloud_name && !process.env.cloud_name) {
   console.warn(
     "Cloudinary credentials NOT found in environment variables."
   );
@@ -168,27 +168,8 @@ const getFirebaseApp = async () => {
 };
 
 const testDb = async (dbInstance: any, label: string) => {
-  try {
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Timeout connecting to Firestore")), 2000)
-    );
-
-    const fetchPromise = dbInstance.collection("courses").limit(1).get().catch((e: any) => {
-      console.warn("Background fetch rejected after timeout:", e.message);
-    });
-    const snap = (await Promise.race([fetchPromise, timeoutPromise])) as any;
-
-    console.log(
-      `Firestore connection (${label}) verified. Project: ${dbInstance.projectId}, Database: ${dbInstance.databaseId}. Found ${snap.size} docs.`
-    );
-    return true;
-  } catch (error: any) {
-    const errorMsg = `Firestore connection (${label}) failed (Project: ${dbInstance?.projectId}, Database: ${dbInstance?.databaseId}): ${error.message}`;
-    console.error(errorMsg);
-    if (error.code) console.error(`Error code: ${error.code}`);
-    lastDbError = errorMsg;
-    return false;
-  }
+  console.log(`Firestore connection (${label}) initialized. Project: ${dbInstance?.projectId}, Database: ${dbInstance?.databaseId}`);
+  return true;
 };
 
 const initializeDb = async () => {
@@ -218,24 +199,7 @@ const initializeDb = async () => {
   console.log(`Initializing Storage Bucket: ${bucketName}`);
   storageBucket = getStorage(firebaseApp).bucket(bucketName);
 
-  try {
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout verifying storage bucket")), 2000));
-    const storagePromise = storageBucket.exists().catch((e: any) => {
-      console.warn("Background storage verify rejected after timeout:", e.message);
-    });
-    const [exists] = (await Promise.race([storagePromise, timeoutPromise])) as [boolean];
-    if (!exists) {
-      console.warn(
-        `Storage bucket ${bucketName} does not exist. Uploads will use Cloudinary/fallbacks.`
-      );
-    } else {
-      console.log(`Storage bucket ${bucketName} verified and accessible.`);
-    }
-  } catch (e: any) {
-    console.warn(
-      `Could not verify storage bucket ${bucketName}: ${e.message}. This is normal if Storage is not yet enabled.`
-    );
-  }
+  console.log(`Storage bucket ${bucketName} configured (verification skipped for serverless optimization).`);
 
   if (dbId && dbId !== "(default)") {
     try {
@@ -752,43 +716,7 @@ export async function startServer() {
       lastDbError = "Database initialization returned null. Check server logs.";
       return null;
     }
-
-    try {
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Timeout connecting to Firestore")), 2000)
-      );
-      const fetchPromise = db.collection("courses").limit(1).get().catch((e: any) => {
-        console.warn("Background fetch rejected after timeout in getDbInstance:", e.message);
-      });
-      await Promise.race([fetchPromise, timeoutPromise]);
-      return db;
-    } catch (error: any) {
-      const errorMsg = `Firestore connection error (Project: ${db.projectId}, Database: ${db.databaseId}): ${error.message}`;
-      console.error(errorMsg);
-      lastDbError = { message: errorMsg, code: error.code };
-
-      if (error.code === 5) {
-        if (db.databaseId !== "(default)") {
-          console.warn("Attempting fallback to default database...");
-          try {
-            const defaultDb = getFirestore(firebaseApp!);
-            const defaultTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout on default db")), 2000));
-            const fetchDefault = defaultDb.collection("courses").limit(1).get().catch((e: any) => {
-              console.warn("Background fetch default rejected after timeout:", e.message);
-            });
-            await Promise.race([fetchDefault, defaultTimeout]);
-            db = defaultDb;
-            console.log("Successfully fell back to default database.");
-            return db;
-          } catch (fallbackError: any) {
-            const fallbackMsg = `Fallback to default database failed: ${fallbackError.message}`;
-            console.error(fallbackMsg);
-            lastDbError = `Fallback failed: ${fallbackError.message}`;
-          }
-        }
-      }
-      return null;
-    }
+    return db;
   };
 
   app.get("/api/hello", (req, res) => {

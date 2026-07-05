@@ -1,12 +1,13 @@
 import { app, startServer } from '../server';
 
-let initialized = false;
+let initPromise: Promise<any> | null = null;
 
 export default async function handler(req: any, res: any) {
-  if (!initialized) {
+  if (!initPromise) {
     console.log("Vercel Serverless: Initializing NexusLearn server...");
-    await startServer();
-    initialized = true;
+    initPromise = startServer();
   }
+  await initPromise;
+  
   return app(req, res);
 }
