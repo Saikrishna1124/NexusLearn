@@ -81,7 +81,7 @@ service cloud.firestore {
     }
 
     function isValidEnrollment(data) {
-      return hasOnlyAllowedFields(['userId', 'courseId', 'progress', 'enrolledAt']) &&
+      return hasOnlyAllowedFields(['userId', 'courseId', 'progress', 'enrolledAt', 'grade', 'timeSpent', 'lastAccessed', 'completedTopics']) &&
              data.userId is string && data.courseId is string;
     }
 
