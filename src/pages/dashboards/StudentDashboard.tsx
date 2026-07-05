@@ -246,7 +246,7 @@ export const StudentDashboard = () => {
 
         {/* Overall Progress Circle */}
         <div className="relative w-48 h-48 flex-shrink-0">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
             <PieChart>
               <Pie
                 data={chartData}
@@ -333,7 +333,7 @@ export const StudentDashboard = () => {
               return (
                 <div key={course.id} className="flex flex-col items-center gap-4">
                   <div className="relative w-32 h-32">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                       <PieChart>
                         <Pie
                           data={data}
@@ -377,7 +377,7 @@ export const StudentDashboard = () => {
           </h2>
           <div className="h-[300px] w-full">
             {quizResults.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                 <LineChart data={quizResults}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                   <XAxis
@@ -425,7 +425,7 @@ export const StudentDashboard = () => {
           </h2>
           <div className="h-[300px] w-full">
             {sessions.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                 <BarChart data={[...sessions].reverse().map(s => ({
                   date: new Date(s.startTime).toLocaleDateString([], { month: 'short', day: 'numeric' }),
                   minutes: Math.round(s.durationSeconds / 60)

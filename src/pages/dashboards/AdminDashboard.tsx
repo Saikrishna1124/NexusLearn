@@ -190,7 +190,7 @@ export const AdminDashboard = () => {
 
           <div className="h-[300px] w-full">
             {enrollmentData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                 <PieChart>
                   <Pie
                     data={enrollmentData}
@@ -232,7 +232,7 @@ export const AdminDashboard = () => {
 
           <div className="h-[300px] w-full">
             {enrollmentTrend.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                 <LineChart data={enrollmentTrend}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                   <XAxis
