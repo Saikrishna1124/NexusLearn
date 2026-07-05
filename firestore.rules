@@ -182,7 +182,7 @@ service cloud.firestore {
     }
 
     match /sessions/{sessionId} {
-      allow read: if isAdmin();
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
       allow update, delete: if isAdmin();
     }
