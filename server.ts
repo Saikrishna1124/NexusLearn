@@ -66,8 +66,12 @@ const __dirname = path.dirname(__filename);
 
 // Ensure uploads directory exists
 const uploadsDir = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir);
+try {
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir);
+  }
+} catch (e) {
+  console.warn("Could not create uploads directory (expected in Vercel serverless environment)");
 }
 
 // Multer memory storage

@@ -7,7 +7,6 @@ uploads                     d-----
 .env                        -a----
 .env.example                -a----
 .gitignore                  -a----
-chatgpt_context.md          -a----
 firebase-applet-config.json -a----
 firebase-blueprint.json     -a----
 firestore.rules             -a----
