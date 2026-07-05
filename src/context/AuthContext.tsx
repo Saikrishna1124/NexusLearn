@@ -54,19 +54,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // 🔥 On app load → validate token
+  // 🔥 On app load → validate token and restore Firebase session
   useEffect(() => {
-    const init = async () => {
-      if (!token) {
+    import('firebase/auth').then(({ onAuthStateChanged }) => {
+      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        if (firebaseUser && token) {
+          setUser(firebaseUser);
+          const success = await fetchProfile(token);
+          if (!success) {
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
         setLoading(false);
-        return;
-      }
+      });
 
-      await fetchProfile(token);
-      setLoading(false);
-    };
-
-    init();
+      return () => unsubscribe();
+    });
   }, [token]);
 
   const loginWithFirebase = async (firebaseUser: FirebaseUser) => {
