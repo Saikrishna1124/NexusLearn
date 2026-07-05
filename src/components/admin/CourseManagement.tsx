@@ -193,17 +193,6 @@ export const CourseManagement = () => {
                   </td>
                   <td className="p-6">
                     <div className="flex items-center justify-end gap-2">
-                      {course.pdfUrl && (
-                        <a
-                          href={course.pdfUrl.startsWith('http') ? course.pdfUrl : window.location.origin + course.pdfUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-indigo-400"
-                          title="View PDF"
-                        >
-                          <FileText className="w-5 h-5" />
-                        </a>
-                      )}
                       <button
                         onClick={() => togglePublish(course.id, course.published)}
                         className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-neonBlue"

@@ -25,7 +25,7 @@ export default function AddCourseModal({ onClose, onAdd, initialInstructorName, 
   const [description, setDescription] = useState(editingCourse?.description || '');
   const [content, setContent] = useState(editingCourse?.content || '');
   const [isUploading, setIsUploading] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
+
   const [thumbnail, setThumbnail] = useState<File | null>(null);
   const [topics, setTopics] = useState<Topic[]>(editingCourse?.topics || []);
   const [overallQuiz, setOverallQuiz] = useState<any[] | null>(editingCourse?.overallQuiz || null);
@@ -80,12 +80,7 @@ export default function AddCourseModal({ onClose, onAdd, initialInstructorName, 
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-    }
-  };
+
 
   const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -107,9 +102,7 @@ export default function AddCourseModal({ onClose, onAdd, initialInstructorName, 
     formData.append('description', description);
     formData.append('topics', JSON.stringify(topics));
     formData.append('overallQuiz', JSON.stringify(overallQuiz));
-    if (file) {
-      formData.append('pdf', file);
-    }
+
     if (thumbnail) {
       formData.append('thumbnail', thumbnail);
     }
@@ -354,33 +347,7 @@ export default function AddCourseModal({ onClose, onAdd, initialInstructorName, 
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-xs font-mono text-neonBlue uppercase tracking-widest">Course Materials (PDF)</label>
-                <input
-                  type="file"
-                  id="course-file"
-                  className="hidden"
-                  accept=".pdf"
-                  onChange={handleFileChange}
-                />
-                <label
-                  htmlFor="course-file"
-                  className="border-2 border-dashed border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 hover:border-neonBlue/30 cursor-pointer transition-colors group h-32"
-                >
-                  {file ? (
-                    <div className="flex flex-col items-center gap-1">
-                      <CheckCircle className="text-neonGreen w-6 h-6" />
-                      <p className="text-neonGreen font-bold text-xs truncate max-w-[150px]">{file.name}</p>
-                    </div>
-                  ) : (
-                    <>
-                      <Upload className="text-gray-500 group-hover:text-neonBlue w-6 h-6" />
-                      <p className="text-white font-bold text-xs">Select PDF</p>
-                    </>
-                  )}
-                </label>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
 
               <div className="space-y-2">
                 <label className="text-xs font-mono text-neonBlue uppercase tracking-widest">Thumbnail Image</label>

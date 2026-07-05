@@ -367,19 +367,9 @@ export const CourseDetail = () => {
               </div>
             </div>
           ) : (
-            <div className="bg-white/5 border border-white/10 rounded-[2.5rem] overflow-hidden min-h-[80vh] h-[800px] relative group shadow-2xl shadow-black/50">
-              {course.pdfUrl ? (
-                <iframe
-                  src={`https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(course.pdfUrl)}`}
-                  title="Course PDF Preview"
-                  className="w-full h-full border-none rounded-[2rem]"
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full p-20 text-gray-400">
-                  <BookOpen className="w-16 h-16 mb-4 opacity-20" />
-                  <p className="text-xl font-medium">No preview available</p>
-                </div>
-              )}
+            <div className="bg-white/5 border border-white/10 rounded-[2.5rem] overflow-hidden min-h-[40vh] h-[400px] flex flex-col items-center justify-center text-gray-400 relative group shadow-2xl shadow-black/50">
+              <BookOpen className="w-16 h-16 mb-4 opacity-20" />
+              <p className="text-xl font-medium">No topics available in this course</p>
             </div>
           )}
 
@@ -470,20 +460,7 @@ export const CourseDetail = () => {
                 </div>
               </button>
 
-              <button
-                onClick={() => setActiveTopic(null)}
-                className={`w-full p-4 rounded-2xl border transition-all flex items-center gap-4 text-left ${!activeTopic
-                  ? 'bg-indigo-600/20 border-indigo-500 text-white'
-                  : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
-              >
-                <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0">
-                  <FileText className="w-5 h-5" />
-                </div>
-                <div className="flex-1">
-                  <div className="font-bold text-sm">Course Material (PDF)</div>
-                  <div className="text-[10px] uppercase tracking-wider opacity-50">Reference Guide</div>
-                </div>
-              </button>
+
 
               {course.topics?.map((topic: any, index: number) => (
                 <button
