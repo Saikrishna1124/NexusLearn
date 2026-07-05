@@ -149,10 +149,12 @@ const getFirebaseApp = async () => {
         projectId: firebaseConfig.projectId || serviceAccount.project_id,
       });
     } else {
-      console.log("Initializing Firebase Admin with projectId only...");
-      firebaseApp = admin.initializeApp({
-        projectId: firebaseConfig.projectId,
-      });
+      console.error(
+        "CRITICAL ERROR: No FIREBASE_SERVICE_ACCOUNT environment variable found, and no local serviceAccountKey.json exists! Firebase Admin requires a service account to run in Vercel."
+      );
+      throw new Error(
+        "Missing FIREBASE_SERVICE_ACCOUNT in Vercel Environment Variables."
+      );
     }
 
     console.log(
